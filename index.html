@@ -1350,6 +1350,14 @@ async function loadComments(diaryId){
   `}).join('');
 }
 
+  
+// 删除评论
+async function deleteComment(commentId, diaryId){
+  if(!confirm("确定删除这条评论吗？")) return;
+  await sb.from("diaries_comments").delete().eq("id", commentId);
+  loadComments(diaryId);
+}
+
 
 // 发送评论
 async function sendComment(diaryId){
