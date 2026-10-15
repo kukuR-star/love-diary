@@ -667,6 +667,22 @@
       font-weight: bold;
       font-size: 14px;
     }
+    .comment-item {
+  position: relative;
+  padding-right: 40px;
+}
+.comment-del {
+  position: absolute;
+  right: 0;
+  top: 0;
+  font-size: 12px;
+  color: #bbb;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.comment-del:hover {
+  color: #ff4d4f;
+}
   </style>
 </head>
 <body>
@@ -1334,7 +1350,7 @@ async function loadComments(diaryId){
     return;
   }
 
-  // 手动匹配评论者昵称，不依赖外键
+  // 批量匹配评论者昵称
   const userIds = [...new Set(list.map(c => c.user_id))];
   const {data: users} = await sb.from("profiles").select("id,nickname").in("id", userIds);
   const userMap = {};
@@ -1342,22 +1358,17 @@ async function loadComments(diaryId){
 
   container.innerHTML = list.map(c => {
     const name = userMap[c.user_id]?.nickname || '匿名';
+    const isMyComment = c.user_id === currentUser.id;
+    
     return `
     <div class="comment-item">
       <span class="comment-author">${name}：</span>
       <span class="comment-content">${c.content}</span>
+      ${isMyComment ? `<span class="comment-del" onclick="deleteComment('${c.id}','${diaryId}')">删除</span>` : ''}
     </div>
-  `}).join('');
+    `
+  }).join('');
 }
-
-  
-// 删除评论
-async function deleteComment(commentId, diaryId){
-  if(!confirm("确定删除这条评论吗？")) return;
-  await sb.from("diaries_comments").delete().eq("id", commentId);
-  loadComments(diaryId);
-}
-
 
 // 发送评论
 async function sendComment(diaryId){
@@ -1375,6 +1386,14 @@ async function sendComment(diaryId){
   input.value = '';
   loadComments(diaryId);
 }
+
+// 删除评论
+async function deleteComment(commentId, diaryId){
+  if(!confirm("确定删除这条评论吗？")) return;
+  await sb.from("diaries_comments").delete().eq("id", commentId);
+  loadComments(diaryId);
+}
+
 
 // ===================== 日历视图 =====================
 function prevMonth(){
