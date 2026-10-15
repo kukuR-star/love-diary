@@ -3,284 +3,740 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>我们的恋爱小屋</title>
+  <title>💖 我们的恋爱小屋</title>
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * {
       box-sizing: border-box;
-      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
     }
     body {
-      background-color: #fceef5;
-      padding: 24px;
-      margin:0;
+      background: linear-gradient(135deg, #ffe6f0 0%, #fff0f5 50%, #ffeef8 100%);
+      min-height: 100vh;
+      padding: 30px 16px;
+      color: #444;
     }
     .container {
-      max-width: 900px;
+      max-width: 780px;
       margin: 0 auto;
     }
-    .header-title {
-      text-align:center;
+
+    /* 顶部标题 */
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
     }
-    .header-title h1{
-      color:#d2648c;
-      margin:0;
-      font-size:28px;
+    .header h1 {
+      color: #d63384;
+      font-size: 30px;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
     }
-    .user-info{
-      text-align:center;
-      color:#555;
-      margin-bottom:24px;
-      font-size:18px;
+    .user-bar {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255,255,255,0.7);
+      padding: 8px 20px;
+      border-radius: 30px;
+      backdrop-filter: blur(10px);
+      font-size: 15px;
+      color: #666;
     }
-    .tab-wrap{
-      display:flex;
-      border-radius:12px;
-      overflow:hidden;
-      margin-bottom:20px;
+
+    /* 登录面板 */
+    .auth-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 32px;
+      box-shadow: 0 8px 30px rgba(214, 51, 132, 0.08);
+      max-width: 420px;
+      margin: 40px auto;
     }
-    .tab-item{
-      flex:1;
-      padding:14px;
-      text-align:center;
-      background:#f7d9e6;
-      border:none;
-      font-size:18px;
-      cursor:pointer;
-      color:#777;
+    .auth-card h3 {
+      text-align: center;
+      color: #d63384;
+      margin-bottom: 20px;
+      font-size: 20px;
     }
-    .tab-item.active{
-      background:#fff;
-      color:#c24e78;
-      font-weight:bold;
+    .auth-btn-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
     }
-    .panel{
-      display:none;
-      background:#fff;
-      padding:24px;
-      border-radius:16px;
-      margin-bottom:16px;
+    .auth-btn-group button {
+      flex: 1;
     }
-    .panel.active{
-      display:block;
+
+    /* 输入框通用 */
+    input, textarea, select {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid #f8d0e0;
+      border-radius: 12px;
+      margin: 8px 0;
+      font-size: 15px;
+      outline: none;
+      transition: all 0.2s;
+      background: #fffafc;
     }
-    textarea,input{
-      width:100%;
-      padding:14px;
-      border:1px solid #f2c8d8;
-      border-radius:10px;
-      margin:8px 0;
-      font-size:16px;
+    input:focus, textarea:focus {
+      border-color: #e86aa0;
+      box-shadow: 0 0 0 3px rgba(232, 106, 160, 0.1);
     }
-    button{
-      background:#c24e78;
-      color:white;
-      border:none;
-      padding:12px 24px;
-      border-radius:10px;
-      font-size:16px;
-      cursor:pointer;
+    textarea {
+      resize: vertical;
+      min-height: 100px;
     }
-    .diary-record-block{
-      background:#fff;
-      padding:20px;
-      border-radius:16px;
-      cursor:pointer;
+
+    /* 按钮通用 */
+    button {
+      background: linear-gradient(135deg, #ec5b95 0%, #d63384 100%);
+      color: #fff;
+      border: none;
+      padding: 11px 20px;
+      border-radius: 12px;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-weight: 500;
     }
-    .diary-item{
-      border-bottom:1px solid #f2d0df;
-      padding:12px 0;
+    button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(214, 51, 132, 0.25);
     }
-    .auth-box{
-      background:#fff;
-      padding:24px;
-      border-radius:16px;
-      max-width:450px;
-      margin:20px auto;
+    button.secondary {
+      background: #f5e6ed;
+      color: #d63384;
+    }
+    button.secondary:hover {
+      background: #f0d9e4;
+      box-shadow: none;
+    }
+
+    /* Tab主标签 */
+    .main-tabs {
+      display: flex;
+      background: rgba(255,255,255,0.6);
+      border-radius: 16px;
+      padding: 6px;
+      margin-bottom: 20px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 15px rgba(214, 51, 132, 0.05);
+    }
+    .main-tab {
+      flex: 1;
+      padding: 12px;
+      text-align: center;
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 500;
+      color: #888;
+      transition: all 0.2s;
+      border: none;
+      background: transparent;
+      font-size: 15px;
+    }
+    .main-tab.active {
+      background: #fff;
+      color: #d63384;
+      box-shadow: 0 2px 8px rgba(214, 51, 132, 0.1);
+    }
+
+    /* 面板 */
+    .panel {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    .panel.active {
+      display: block;
+    }
+    @keyframes fadeIn {
+      from {opacity: 0; transform: translateY(6px);}
+      to {opacity: 1; transform: translateY(0);}
+    }
+
+    /* 卡片通用 */
+    .card {
+      background: #fff;
+      border-radius: 18px;
+      padding: 24px;
+      margin-bottom: 18px;
+      box-shadow: 0 4px 20px rgba(214, 51, 132, 0.06);
+    }
+    .card h4 {
+      color: #d63384;
+      margin-bottom: 14px;
+      font-size: 17px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* 日记项 */
+    .diary-item {
+      padding: 16px 0;
+      border-bottom: 1px dashed #f5d9e6;
+    }
+    .diary-item:last-child {
+      border-bottom: none;
+    }
+    .diary-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .diary-author {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+      color: #d63384;
+    }
+    .avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ffb3d1, #ff80ab);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 13px;
+    }
+    .diary-time {
+      font-size: 13px;
+      color: #aaa;
+    }
+    .mood-tag {
+      display: inline-block;
+      background: #fff0f5;
+      color: #d63384;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    .diary-content {
+      line-height: 1.7;
+      color: #555;
+      font-size: 15px;
+    }
+
+    /* 子标签 */
+    .sub-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      border-bottom: 2px solid #f8e1eb;
+    }
+    .sub-tab {
+      padding: 8px 16px;
+      cursor: pointer;
+      color: #888;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      font-size: 14px;
+    }
+    .sub-tab.active {
+      color: #d63384;
+      border-bottom-color: #d63384;
+      font-weight: 500;
+    }
+
+    /* 小红花统计 */
+    .flower-stats {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .stat-box {
+      flex: 1;
+      background: linear-gradient(135deg, #fff0f5, #ffe6f0);
+      border-radius: 14px;
+      padding: 16px;
+      text-align: center;
+    }
+    .stat-num {
+      font-size: 28px;
+      font-weight: bold;
+      color: #d63384;
+    }
+    .stat-label {
+      font-size: 13px;
+      color: #999;
+      margin-top: 4px;
+    }
+
+    /* 列表项 */
+    .list-item {
+      padding: 12px 0;
+      border-bottom: 1px solid #f7e8ef;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .list-item:last-child {
+      border-bottom: none;
+    }
+    .item-left {
+      flex: 1;
+    }
+    .item-title {
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+    .item-desc {
+      font-size: 12px;
+      color: #999;
+    }
+    .item-done .item-title {
+      text-decoration: line-through;
+      color: #bbb;
+    }
+
+    /* 空状态 */
+    .empty {
+      text-align: center;
+      padding: 30px 0;
+      color: #bbb;
+      font-size: 14px;
+    }
+
+    /* 行内按钮组 */
+    .inline-btn {
+      display: flex;
+      gap: 8px;
+    }
+    .mini-btn {
+      padding: 6px 12px;
+      font-size: 13px;
+      border-radius: 8px;
     }
   </style>
 </head>
 <body>
 <div class="container">
-  <div class="header-title">
-    <h1>💖我们的恋爱小屋</h1>
-  </div>
-  <div class="user-info">当前登录：<span id="user-info">加载中...</span></div>
-
-  <!-- 登录面板 -->
-  <div id="auth-panel" class="auth-box">
-    <h3>登录 / 注册</h3>
-    <input type="email" id="login-email" placeholder="邮箱">
-    <input type="password" id="login-pwd" placeholder="密码">
-    <div style="display:flex;gap:10px;margin-top:10px;">
-      <button onclick="signIn()">登录</button>
-      <button onclick="signUp()">注册</button>
-      <button onclick="signOut()">退出登录</button>
+  <div class="header">
+    <h1>💖 我们的恋爱小屋</h1>
+    <div class="user-bar">
+      <span>当前登录：</span>
+      <span id="user-info">加载中...</span>
     </div>
   </div>
 
-  <!-- Tab标签 -->
-  <div class="tab-wrap">
-    <button class="tab-item active" data-tab="diary">生活日记</button>
-    <button class="tab-item" data-tab="flower">小红花奖励</button>
-    <button class="tab-item" data-tab="wish">许愿礼物</button>
+  <!-- 登录面板 -->
+  <div id="auth-panel" class="auth-card">
+    <h3>登录 / 注册</h3>
+    <input type="email" id="login-email" placeholder="请输入邮箱">
+    <input type="password" id="login-pwd" placeholder="请输入密码">
+    <div class="auth-btn-group">
+      <button onclick="signIn()">登录</button>
+      <button class="secondary" onclick="signUp()">注册</button>
+    </div>
+    <button class="secondary" style="width:100%;margin-top:10px;" onclick="signOut()">退出登录</button>
   </div>
 
-  <!-- 生活日记面板 -->
-  <div class="panel active" id="panel-diary">
-    <h3>📝写新日记</h3>
-    <textarea id="diary-content" rows="5" placeholder="记录今天的小故事..."></textarea>
-    <input type="text" id="diary-mood" placeholder="心情（例如：开心）">
-    <button onclick="saveDiary()">保存日记</button>
-  </div>
+  <!-- 主内容区（登录后显示） -->
+  <div id="main-content" style="display:none;">
 
-  <!-- 小红花面板（预留） -->
-  <div class="panel" id="panel-flower">
-    <h3>🌸小红花奖励</h3>
-    <p>小红花功能待开发</p>
-  </div>
+    <!-- 主Tab -->
+    <div class="main-tabs">
+      <button class="main-tab active" data-tab="diary">📝 生活日记</button>
+      <button class="main-tab" data-tab="flower">🌸 小红花奖励</button>
+      <button class="main-tab" data-tab="wish">🎁 许愿礼物</button>
+    </div>
 
-  <!-- 许愿面板（预留） -->
-  <div class="panel" id="panel-wish">
-    <h3>🎁许愿礼物</h3>
-    <p>许愿清单功能待开发</p>
-  </div>
+    <!-- ========== 日记面板 ========== -->
+    <div class="panel active" id="panel-diary">
+      <div class="card">
+        <h4>✍️ 写新日记</h4>
+        <textarea id="diary-content" placeholder="记录今天的小故事..."></textarea>
+        <input type="text" id="diary-mood" placeholder="今日心情（如：开心、感动、生气）">
+        <button onclick="saveDiary()" style="width:100%;margin-top:6px;">保存日记</button>
+      </div>
 
-  <!-- 时光记录区域 -->
-  <div class="diary-record-block" onclick="loadDiaryList()">
-    <h3>📖时光记录</h3>
-    <div id="diary-list"></div>
+      <div class="card">
+        <h4>📖 时光记录</h4>
+        <div id="diary-list">
+          <div class="empty">点击加载日记记录</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 小红花面板 ========== -->
+    <div class="panel" id="panel-flower">
+      <div class="card">
+        <h4>🌸 小红花统计</h4>
+        <div class="flower-stats">
+          <div class="stat-box">
+            <div class="stat-num" id="flower-received">0</div>
+            <div class="stat-label">收到的花</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-num" id="flower-sent">0</div>
+            <div class="stat-label">送出的花</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="sub-tabs">
+          <div class="sub-tab active" data-sub="send">送小红花</div>
+          <div class="sub-tab" data-sub="records">送花记录</div>
+          <div class="sub-tab" data-sub="reward">奖励池</div>
+        </div>
+
+        <!-- 送花 -->
+        <div class="sub-panel" id="sub-send">
+          <input type="number" id="flower-amount" placeholder="送几朵小红花" min="1" value="1">
+          <input type="text" id="flower-reward" placeholder="奖励备注（可选）">
+          <button onclick="sendFlower()" style="width:100%;">送出小红花 🌸</button>
+        </div>
+
+        <!-- 记录 -->
+        <div class="sub-panel" id="sub-records" style="display:none;">
+          <div id="flower-list">
+            <div class="empty">暂无记录</div>
+          </div>
+        </div>
+
+        <!-- 奖励池 -->
+        <div class="sub-panel" id="sub-reward" style="display:none;">
+          <input type="text" id="reward-input" placeholder="添加一个奖励（如：看一场电影）">
+          <button class="secondary" onclick="addReward()" style="width:100%;margin-bottom:14px;">添加到奖励池</button>
+          <div id="reward-list">
+            <div class="empty">暂无奖励</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== 许愿面板 ========== -->
+    <div class="panel" id="panel-wish">
+      <div class="card">
+        <h4>🎁 愿望清单</h4>
+        <input type="text" id="wish-input" placeholder="写下你的小愿望...">
+        <input type="date" id="wish-deadline">
+        <button onclick="addWish()" style="width:100%;margin-bottom:20px;">添加愿望</button>
+
+        <div class="sub-tabs">
+          <div class="sub-tab active" data-wish="todo">待实现</div>
+          <div class="sub-tab" data-wish="done">已实现</div>
+        </div>
+        <div id="wish-list">
+          <div class="empty">暂无愿望</div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
 <script>
-// ===================== Supabase 配置（已填好你的信息）=====================
+// ===================== Supabase 配置 =====================
 const SUPABASE_URL = "https://bxiiapjcghlvyfgpfjhi.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_mQ_pZNPxV_lOYTGmVBzojg_27dBUx1G";
-// ==========================================================================
-
-// 创建客户端实例 sb
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// Tab切换
-document.querySelectorAll(".tab-item").forEach(tab=>{
-  tab.onclick = function(){
-    const tabName = this.dataset.tab;
-    document.querySelectorAll(".tab-item").forEach(t=>t.classList.remove("active"));
-    document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
-    this.classList.add("active");
-    document.getElementById("panel-"+tabName).classList.add("active");
-  }
-})
-
-// 页面初始化
-async function init(){
+// ===================== 初始化 =====================
+let currentUser = null;
+async function init() {
   await refreshUser();
+  if(currentUser){
+    loadDiaryList();
+    loadFlowerStats();
+    loadFlowerRecords();
+    loadRewardList();
+    loadWishList();
+  }
 }
 
-// 刷新用户信息，修复null问题
+// ===================== 登录注册 =====================
 async function refreshUser(){
   const {data:{user}} = await sb.auth.getUser();
+  currentUser = user;
   const userDom = document.getElementById("user-info");
   const authPanel = document.getElementById("auth-panel");
+  const mainContent = document.getElementById("main-content");
+
   if(user){
     authPanel.style.display = "none";
-    // 读取profiles表的nickname
+    mainContent.style.display = "block";
     const {data:profile} = await sb.from("profiles").select("nickname").eq("id",user.id).single();
-    const name = profile?.nickname || user.email;
+    const name = profile?.nickname || user.email.split('@')[0];
     userDom.innerText = name;
   }else{
     authPanel.style.display = "block";
+    mainContent.style.display = "none";
     userDom.innerText = "未登录";
   }
 }
 
-// 登录
 async function signIn(){
   const email = document.getElementById("login-email").value;
   const password = document.getElementById("login-pwd").value;
   const {error} = await sb.auth.signInWithPassword({email,password});
-  if(error) alert(error.message);
-  await refreshUser();
+  if(error) return alert(error.message);
+  await init();
 }
-// 注册
 async function signUp(){
   const email = document.getElementById("login-email").value;
   const password = document.getElementById("login-pwd").value;
   const {error} = await sb.auth.signUp({email,password});
-  if(error) alert(error.message);
-  await refreshUser();
+  if(error) return alert(error.message);
+  alert("注册成功！请登录");
 }
-// 退出登录
 async function signOut(){
   await sb.auth.signOut();
   await refreshUser();
 }
 
-// 保存日记，diaries表，author_id
-async function saveDiary(){
-  const {data:{user}} = await sb.auth.getUser();
-  if(!user){
-    alert("请先登录");
-    return;
+// ===================== 主Tab切换 =====================
+document.querySelectorAll(".main-tab").forEach(tab=>{
+  tab.onclick = function(){
+    const name = this.dataset.tab;
+    document.querySelectorAll(".main-tab").forEach(t=>t.classList.remove("active"));
+    document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
+    this.classList.add("active");
+    document.getElementById("panel-"+name).classList.add("active");
   }
+})
+
+// ===================== 日记模块 =====================
+async function saveDiary(){
+  if(!currentUser) return alert("请先登录");
   const content = document.getElementById("diary-content").value.trim();
   const mood = document.getElementById("diary-mood").value.trim();
-  if(!content){
-    alert("日记内容不能为空");
-    return;
-  }
+  if(!content) return alert("日记内容不能为空");
+
   const {error} = await sb.from("diaries").insert({
-    author_id: user.id,
+    author_id: currentUser.id,
     content: content,
     mood: mood
   })
-  if(error){
-    console.error(error);
-    alert("保存失败："+error.message);
-  }else{
-    alert("✅日记保存成功！");
-    document.getElementById("diary-content").value = "";
-    document.getElementById("diary-mood").value = "";
-    loadDiaryList();
-  }
+  if(error) return alert("保存失败："+error.message);
+  alert("✅日记保存成功！");
+  document.getElementById("diary-content").value = "";
+  document.getElementById("diary-mood").value = "";
+  loadDiaryList();
 }
 
-// 读取日记列表（时光记录）
 async function loadDiaryList(){
-  const {data:{user}} = await sb.auth.getUser();
-  if(!user){
-    alert("请先登录查看日记");
+  if(!currentUser) return;
+  const {data:list,error} = await sb.from("diaries")
+    .select("*, profiles!diaries_author_id_fkey(nickname)")
+    .order("created_at",{ascending:false});
+
+  if(error) return console.error(error);
+  const container = document.getElementById("diary-list");
+  if(list.length === 0){
+    container.innerHTML = '<div class="empty">还没有日记，快去写第一篇吧～</div>';
     return;
   }
-  const {data:diaryList,error} = await sb.from("diaries")
+
+  container.innerHTML = list.map(item=>{
+    const name = item.profiles?.nickname || "匿名";
+    const firstChar = name.charAt(0).toUpperCase();
+    const time = new Date(item.created_at).toLocaleString('zh-CN',{
+      month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'
+    });
+    return `
+    <div class="diary-item">
+      <div class="diary-header">
+        <div class="diary-author">
+          <div class="avatar">${firstChar}</div>
+          <span>${name}</span>
+        </div>
+        <div class="diary-time">${time}</div>
+      </div>
+      ${item.mood ? `<div class="mood-tag">${item.mood}</div>` : ''}
+      <div class="diary-content">${item.content}</div>
+    </div>
+    `
+  }).join('');
+}
+
+// ===================== 小红花子Tab切换 =====================
+document.querySelectorAll(".sub-tab[data-sub]").forEach(tab=>{
+  tab.onclick = function(){
+    const name = this.dataset.sub;
+    document.querySelectorAll(".sub-tab[data-sub]").forEach(t=>t.classList.remove("active"));
+    document.querySelectorAll(".sub-panel").forEach(p=>p.style.display="none");
+    this.classList.add("active");
+    document.getElementById("sub-"+name).style.display = "block";
+  }
+})
+
+async function sendFlower(){
+  if(!currentUser) return alert("请先登录");
+  const amount = parseInt(document.getElementById("flower-amount").value) || 1;
+  const rewardText = document.getElementById("flower-reward").value.trim();
+
+  const {error} = await sb.from("flower_records").insert({
+    sender_id: currentUser.id,
+    receiver_id: currentUser.id, // 单人模式先送给自己，情侣版可绑定对方ID
+    type: "send",
+    amount: amount,
+    reward_text: rewardText
+  })
+  if(error) return alert("送花失败："+error.message);
+  alert(`🌸 成功送出 ${amount} 朵小红花！`);
+  document.getElementById("flower-reward").value = "";
+  loadFlowerStats();
+  loadFlowerRecords();
+}
+
+async function loadFlowerStats(){
+  if(!currentUser) return;
+  const {data:received} = await sb.from("flower_records")
+    .select("amount").eq("receiver_id", currentUser.id);
+  const {data:sent} = await sb.from("flower_records")
+    .select("amount").eq("sender_id", currentUser.id);
+
+  const sum = (arr)=> arr.reduce((s,i)=>s+i.amount, 0);
+  document.getElementById("flower-received").innerText = sum(received || []);
+  document.getElementById("flower-sent").innerText = sum(sent || []);
+}
+
+async function loadFlowerRecords(){
+  if(!currentUser) return;
+  const {data:list,error} = await sb.from("flower_records")
     .select("*")
     .order("created_at",{ascending:false});
-  if(error){
-    console.error(error);
-    alert("读取日记失败："+error.message);
+
+  if(error) return console.error(error);
+  const container = document.getElementById("flower-list");
+  if(list.length === 0){
+    container.innerHTML = '<div class="empty">暂无送花记录</div>';
     return;
   }
-  const container = document.getElementById("diary-list");
-  container.innerHTML = "";
-  if(diaryList.length ===0){
-    container.innerHTML = "<p>暂无日记记录</p>";
-    return;
-  }
-  diaryList.forEach(item=>{
-    const time = new Date(item.created_at).toLocaleString();
-    container.innerHTML += `
-      <div class="diary-item">
-        <div>${time}</div>
-        <div>心情：${item.mood||"无"}</div>
-        <div>${item.content}</div>
+  container.innerHTML = list.map(item=>`
+    <div class="list-item">
+      <div class="item-left">
+        <div class="item-title">🌸 ${item.amount} 朵小红花</div>
+        <div class="item-desc">${item.reward_text || '无备注'} · ${new Date(item.created_at).toLocaleDateString()}</div>
       </div>
-    `
-  })
+    </div>
+  `).join('');
 }
 
-// 页面加载执行
+// ===================== 奖励池 =====================
+async function addReward(){
+  if(!currentUser) return alert("请先登录");
+  const text = document.getElementById("reward-input").value.trim();
+  if(!text) return alert("请输入奖励内容");
+
+  const {error} = await sb.from("reward_pool").insert({
+    created_by: currentUser.id,
+    content: text
+  })
+  if(error) return alert("添加失败："+error.message);
+  document.getElementById("reward-input").value = "";
+  loadRewardList();
+}
+
+async function loadRewardList(){
+  if(!currentUser) return;
+  const {data:list,error} = await sb.from("reward_pool")
+    .select("*").order("created_at",{ascending:false});
+
+  if(error) return console.error(error);
+  const container = document.getElementById("reward-list");
+  if(list.length === 0){
+    container.innerHTML = '<div class="empty">奖励池空空的，快去添加吧～</div>';
+    return;
+  }
+  container.innerHTML = list.map(item=>`
+    <div class="list-item">
+      <div class="item-left">
+        <div class="item-title">🎁 ${item.content}</div>
+      </div>
+      <div class="inline-btn">
+        <button class="mini-btn secondary" onclick="deleteReward('${item.id}')">删除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function deleteReward(id){
+  if(!confirm("确定删除这个奖励吗？")) return;
+  await sb.from("reward_pool").delete().eq("id",id);
+  loadRewardList();
+}
+
+// ===================== 许愿清单 =====================
+document.querySelectorAll(".sub-tab[data-wish]").forEach(tab=>{
+  tab.onclick = function(){
+    document.querySelectorAll(".sub-tab[data-wish]").forEach(t=>t.classList.remove("active"));
+    this.classList.add("active");
+    loadWishList();
+  }
+})
+
+async function addWish(){
+  if(!currentUser) return alert("请先登录");
+  const content = document.getElementById("wish-input").value.trim();
+  const deadline = document.getElementById("wish-deadline").value;
+  if(!content) return alert("请输入愿望内容");
+
+  const {error} = await sb.from("wish_list").insert({
+    creator_id: currentUser.id,
+    content: content,
+    deadline: deadline || null
+  })
+  if(error) return alert("添加失败："+error.message);
+  document.getElementById("wish-input").value = "";
+  document.getElementById("wish-deadline").value = "";
+  loadWishList();
+}
+
+async function loadWishList(){
+  if(!currentUser) return;
+  const activeTab = document.querySelector(".sub-tab[data-wish].active").dataset.wish;
+  const isDone = activeTab === "done";
+
+  const {data:list,error} = await sb.from("wish_list")
+    .select("*").eq("done", isDone)
+    .order("created_at",{ascending:false});
+
+  if(error) return console.error(error);
+  const container = document.getElementById("wish-list");
+  if(list.length === 0){
+    container.innerHTML = `<div class="empty">${isDone ? '还没有实现的愿望' : '暂无待实现愿望'}</div>`;
+    return;
+  }
+
+  container.innerHTML = list.map(item=>`
+    <div class="list-item ${item.done ? 'item-done' : ''}">
+      <div class="item-left">
+        <div class="item-title">⭐ ${item.content}</div>
+        <div class="item-desc">${item.deadline ? '截止：'+item.deadline : '无截止日期'}</div>
+      </div>
+      <div class="inline-btn">
+        ${!item.done ? `<button class="mini-btn" onclick="toggleWish('${item.id}', true)">完成</button>` : ''}
+        <button class="mini-btn secondary" onclick="deleteWish('${item.id}')">删除</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function toggleWish(id, done){
+  await sb.from("wish_list").update({done}).eq("id",id);
+  loadWishList();
+}
+
+async function deleteWish(id){
+  if(!confirm("确定删除这个愿望吗？")) return;
+  await sb.from("wish_list").delete().eq("id",id);
+  loadWishList();
+}
+
+// 启动
 init();
 </script>
 </body>
