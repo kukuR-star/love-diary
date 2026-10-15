@@ -111,9 +111,9 @@ button.success{background:#52c41a;}
 
 <script>
 // ========== 【这里替换成你自己Supabase的信息！！】 =========
-const SUPABASE_URL = "https://bxiiapjcghlvyfgpfjhi.supabase.co";
+const SUPABASE_URL = "https://bxiiapjcghlvyfgpfjhi.sb.co";
 const SUPABASE_ANON_KEY = "sb_publishable_mQ_pZNPxV_lOYTGmVBzojg_27dBUx1G";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = window.sb.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentUser = null;
 let allUsers = [];
@@ -131,7 +131,7 @@ document.querySelectorAll('.tab').forEach(tab=>{
 
 // 登录状态监听
 async function init(){
-  const {data:{session}} = await supabase.auth.getSession();
+  const {data:{session}} = await sb.auth.getSession();
   if(session){
     currentUser = session.user;
     showApp();
@@ -160,7 +160,7 @@ async function signUp(){
   const password = document.getElementById("loginPwd").value.trim();
   const nickname = document.getElementById("loginNickname").value.trim();
   if(!email || !password || !nickname) return alert("邮箱、密码、昵称不能为空");
-  const {data,error} = await supabase.auth.signUp({
+  const {data,error} = await sb.auth.signUp({
     email,password,
     options:{data:{nickname}}
   });
@@ -171,7 +171,7 @@ async function signUp(){
 async function signIn(){
   const email = document.getElementById("loginEmail").value.trim();
   const password = document.getElementById("loginPwd").value.trim();
-  const {data,error} = await supabase.auth.signInWithPassword({email,password});
+  const {data,error} = await sb.auth.signInWithPassword({email,password});
   if(error) return alert(error.message);
   currentUser = data.user;
   showApp();
@@ -181,14 +181,14 @@ async function signIn(){
 }
 // 登出
 async function signOut(){
-  await supabase.auth.signOut();
+  await sb.auth.signOut();
   currentUser=null;
   showLogin();
 }
 
 // 加载全部用户（用于赠送小红花下拉框）
 async function loadAllUsers(){
-  const {data,error} = await supabase.from("profiles").select("id,nickname");
+  const {data,error} = await sb.from("profiles").select("id,nickname");
   if(error) return console.error(error);
   allUsers = data;
   const sel = document.getElementById("sendTarget");
@@ -208,7 +208,7 @@ async function addDiary(){
   const content = document.getElementById("diaryContent").value.trim();
   const mood = document.getElementById("diaryMood").value.trim() || "普通";
   if(!content) return alert("请输入日记");
-  const {error} = await supabase.from("diaries").insert([{
+  const {error} = await sb.from("diaries").insert([{
     author_id:currentUser.id, content,mood
   }]);
   if(error) alert(error.message);
@@ -235,29 +235,29 @@ async function renderDiary(){
 async function sendFlower(){
   const receiver_id = document.getElementById("sendTarget").value;
   if(!receiver_id) return alert("请选择赠送对象");
-  const {error} = await supabase.from("flower_records").insert([{
+  const {error} = await sb.from("flower_records").insert([{
     sender_id:currentUser.id, receiver_id, type:"send", amount:1
   }]);
   if(error) alert(error.message);
 }
 async function exchangeReward(){
   // 查询我的花朵余额
-  const {data:balanceData} = await supabase.from("user_flower_balance").select("total_flowers").eq("uid",currentUser.id).single();
+  const {data:balanceData} = await sb.from("user_flower_balance").select("total_flowers").eq("uid",currentUser.id).single();
   const myFlower = balanceData?.total_flowers || 0;
   if(myFlower <5) return alert("小红花不足5朵，无法兑换");
   // 获取奖励池随机一条
-  const {data:rewards} = await supabase.from("reward_pool").select("id,content");
+  const {data:rewards} = await sb.from("reward_pool").select("id,content");
   if(!rewards || rewards.length ===0) return alert("奖励池为空，请先添加奖励");
   const randomReward = rewards[Math.floor(Math.random()*rewards.length)];
   // 插入兑换记录（扣5朵）
-  const {error} = await supabase.from("flower_records").insert([{
+  const {error} = await sb.from("flower_records").insert([{
     sender_id:currentUser.id, receiver_id:currentUser.id, type:"exchange", amount:5, reward_text:randomReward.content
   }]);
   if(error) return alert(error.message);
   alert(`🎉兑换成功！奖励：${randomReward.content}`);
 }
 async function renderFlower(){
-  const {data:balanceData} = await supabase.from("user_flower_balance").select("total_flowers").eq("uid",currentUser.id).single();
+  const {data:balanceData} = await sb.from("user_flower_balance").select("total_flowers").eq("uid",currentUser.id).single();
   const myFlower = balanceData?.total_flowers || 0;
   document.getElementById("myFlowerNum").innerText = myFlower;
 
@@ -284,14 +284,14 @@ async function renderFlower(){
 async function addReward(){
   const val = document.getElementById("rewardInput").value.trim();
   if(!val) return;
-  const {error} = await supabase.from("reward_pool").insert([{
+  const {error} = await sb.from("reward_pool").insert([{
     content:val, created_by:currentUser.id
   }]);
   if(error) alert(error.message);
   document.getElementById("rewardInput").value="";
 }
 async function renderReward(){
-  const {data,error} = await supabase.from("reward_pool").select(`*, profiles:created_by(nickname)`);
+  const {data,error} = await sb.from("reward_pool").select(`*, profiles:created_by(nickname)`);
   if(error) return;
   const dom = document.getElementById("rewardList");
   dom.innerHTML="";
@@ -308,14 +308,14 @@ async function addWish(){
   const text = document.getElementById("wishText").value.trim();
   const deadline = document.getElementById("wishDeadline").value;
   if(!text) return alert("请填写愿望");
-  const {error} = await supabase.from("wish_list").insert([{
+  const {error} = await sb.from("wish_list").insert([{
     creator_id:currentUser.id, content:text, deadline
   }]);
   if(error) alert(error.message);
   document.getElementById("wishText").value="";
 }
 async function renderWish(){
-  const {data,error} = await supabase.from("wish_list")
+  const {data,error} = await sb.from("wish_list")
     .select(`*, profiles:creator_id(nickname)`)
     .order("created_at",{asc:false});
   if(error) return;
@@ -334,7 +334,7 @@ async function renderWish(){
   })
 }
 async function finishWish(wishId){
-  const {error} = await supabase.from("wish_list").update({done:true}).eq("id",wishId);
+  const {error} = await sb.from("wish_list").update({done:true}).eq("id",wishId);
   if(error) alert(error.message);
 }
 
@@ -348,7 +348,7 @@ async function renderAll(){
 
 // 实时订阅：数据库变化自动刷新页面（双人实时同步核心）
 function subscribeRealtime(){
-  supabase.channel('love-app-channel')
+  sb.channel('love-app-channel')
     .on('postgres_changes', {event:'*', schema:'public', table:'diaries'}, renderAll)
     .on('postgres_changes', {event:'*', schema:'public', table:'flower_records'}, renderAll)
     .on('postgres_changes', {event:'*', schema:'public', table:'reward_pool'}, renderAll)
