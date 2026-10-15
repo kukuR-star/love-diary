@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>💖 我们的恋爱小屋</title>
+  <title id="page-title">💖 我们的恋爱小屋</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * {
@@ -23,7 +23,7 @@
       margin: 0 auto;
     }
 
-    /* 顶部 */
+    /* 顶部标题区 */
     .header {
       text-align: center;
       margin-bottom: 20px;
@@ -33,6 +33,12 @@
       font-size: 30px;
       letter-spacing: 2px;
       margin-bottom: 10px;
+      cursor: pointer;
+      display: inline-block;
+      transition: opacity 0.2s;
+    }
+    .header h1:hover {
+      opacity: 0.8;
     }
     .user-bar {
       display: inline-flex;
@@ -44,6 +50,12 @@
       backdrop-filter: blur(10px);
       font-size: 15px;
       color: #666;
+    }
+    .user-info-click {
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
     .bind-btn {
       background: #fff;
@@ -124,6 +136,11 @@
       background: #f0d9e4;
       box-shadow: none;
     }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
 
     /* 主Tab */
     .main-tabs {
@@ -184,6 +201,34 @@
       gap: 8px;
     }
 
+    /* 表情选择器 */
+    .mood-picker {
+      display: flex;
+      gap: 10px;
+      margin: 8px 0 12px;
+      flex-wrap: wrap;
+    }
+    .mood-item {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #fff0f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 2px solid transparent;
+    }
+    .mood-item:hover {
+      transform: scale(1.1);
+    }
+    .mood-item.active {
+      border-color: #d63384;
+      background: #ffe6f0;
+    }
+
     /* 日记项 */
     .diary-item {
       padding: 16px 0;
@@ -213,8 +258,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #fff;
-      font-size: 13px;
+      font-size: 16px;
     }
     .avatar.other {
       background: linear-gradient(135deg, #a8c8ff, #7aa7ff);
@@ -273,10 +317,16 @@
       padding: 16px;
       text-align: center;
     }
+    .stat-box.balance {
+      background: linear-gradient(135deg, #fff3e0, #ffe0b2);
+    }
     .stat-num {
       font-size: 28px;
       font-weight: bold;
       color: #d63384;
+    }
+    .stat-box.balance .stat-num {
+      color: #f57c00;
     }
     .stat-label {
       font-size: 13px;
@@ -330,7 +380,7 @@
       border-radius: 8px;
     }
 
-    /* 绑定弹窗 */
+    /* 弹窗通用 */
     .modal-mask {
       position: fixed;
       top:0; left:0;
@@ -350,11 +400,44 @@
       padding: 28px;
       width: 90%;
       max-width: 380px;
+      animation: modalIn 0.2s ease;
+    }
+    @keyframes modalIn {
+      from {opacity: 0; transform: scale(0.95);}
+      to {opacity: 1; transform: scale(1);}
     }
     .modal h4 {
       color: #d63384;
       margin-bottom: 16px;
       text-align: center;
+    }
+
+    /* 头像选择 */
+    .avatar-picker {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 8px 0 16px;
+      justify-content: center;
+    }
+    .avatar-item {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: #fff0f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .avatar-item:hover {
+      transform: scale(1.1);
+    }
+    .avatar-item.active {
+      border-color: #d63384;
     }
 
     /* 情侣状态 */
@@ -369,14 +452,24 @@
       justify-content: space-between;
       align-items: center;
     }
+
+    /* 奖励项 */
+    .reward-cost {
+      color: #f57c00;
+      font-weight: bold;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
 <div class="container">
   <div class="header">
-    <h1>💖 我们的恋爱小屋</h1>
+    <h1 id="site-title" onclick="editTitle()">💖 我们的恋爱小屋</h1>
     <div class="user-bar">
-      <span id="user-info">加载中...</span>
+      <div class="user-info-click" onclick="openProfileModal()">
+        <span id="user-avatar">😊</span>
+        <span id="user-info">加载中...</span>
+      </div>
       <button class="bind-btn" onclick="openBindModal()">绑定伴侣</button>
     </div>
   </div>
@@ -413,7 +506,15 @@
       <div class="card">
         <h4>✍️ 写新日记</h4>
         <textarea id="diary-content" placeholder="记录今天的小故事..."></textarea>
-        <input type="text" id="diary-mood" placeholder="今日心情（如：开心、感动、生气）">
+        <p style="font-size:14px;color:#888;margin:8px 0 4px;">今日心情</p>
+        <div class="mood-picker" id="mood-picker">
+          <div class="mood-item" data-mood="开心" onclick="pickMood(this)">😊</div>
+          <div class="mood-item" data-mood="幸福" onclick="pickMood(this)">🥰</div>
+          <div class="mood-item" data-mood="难过" onclick="pickMood(this)">😢</div>
+          <div class="mood-item" data-mood="生气" onclick="pickMood(this)">😠</div>
+          <div class="mood-item" data-mood="失落" onclick="pickMood(this)">😔</div>
+          <div class="mood-item" data-mood="惊喜" onclick="pickMood(this)">🎉</div>
+        </div>
         <button onclick="saveDiary()" style="width:100%;margin-top:6px;">保存日记</button>
       </div>
 
@@ -432,11 +533,15 @@
         <div class="flower-stats">
           <div class="stat-box">
             <div class="stat-num" id="flower-received">0</div>
-            <div class="stat-label">收到的花</div>
+            <div class="stat-label">累计收到</div>
           </div>
           <div class="stat-box">
             <div class="stat-num" id="flower-sent">0</div>
-            <div class="stat-label">送出的花</div>
+            <div class="stat-label">累计送出</div>
+          </div>
+          <div class="stat-box balance">
+            <div class="stat-num" id="flower-balance">0</div>
+            <div class="stat-label">可兑换余额</div>
           </div>
         </div>
       </div>
@@ -444,14 +549,14 @@
       <div class="card">
         <div class="sub-tabs">
           <div class="sub-tab active" data-sub="send">送TA小红花</div>
-          <div class="sub-tab" data-sub="records">送花记录</div>
+          <div class="sub-tab" data-sub="records">收支记录</div>
           <div class="sub-tab" data-sub="reward">奖励池</div>
         </div>
 
         <!-- 送花 -->
         <div class="sub-panel" id="sub-send">
           <input type="number" id="flower-amount" placeholder="送几朵小红花" min="1" value="1">
-          <input type="text" id="flower-reward" placeholder="奖励备注（可选）">
+          <input type="text" id="flower-reward" placeholder="送花原因 / 备注（可选）">
           <button onclick="sendFlower()" style="width:100%;">送给TA 🌸</button>
         </div>
 
@@ -464,7 +569,8 @@
 
         <!-- 奖励池 -->
         <div class="sub-panel" id="sub-reward" style="display:none;">
-          <input type="text" id="reward-input" placeholder="添加一个奖励（如：看一场电影）">
+          <input type="text" id="reward-input" placeholder="奖励内容（如：一台相机）">
+          <input type="number" id="reward-cost" placeholder="所需小红花数量" min="1" value="5">
           <button class="secondary" onclick="addReward()" style="width:100%;margin-bottom:14px;">添加到奖励池</button>
           <div id="reward-list">
             <div class="empty">暂无奖励</div>
@@ -494,7 +600,7 @@
   </div>
 </div>
 
-<!-- 绑定弹窗 -->
+<!-- 绑定伴侣弹窗 -->
 <div class="modal-mask" id="bind-modal">
   <div class="modal">
     <h4>💑 绑定你的另一半</h4>
@@ -502,6 +608,37 @@
     <input type="email" id="bind-email" placeholder="对方的注册邮箱">
     <button onclick="bindPartner()" style="width:100%;margin-top:8px;">确认绑定</button>
     <button class="secondary" style="width:100%;margin-top:8px;" onclick="closeBindModal()">取消</button>
+  </div>
+</div>
+
+<!-- 编辑资料弹窗 -->
+<div class="modal-mask" id="profile-modal">
+  <div class="modal">
+    <h4>✨ 编辑我的资料</h4>
+    <p style="font-size:14px;color:#888;text-align:center;margin-bottom:8px;">选择头像</p>
+    <div class="avatar-picker" id="avatar-picker">
+      <div class="avatar-item" data-avatar="😊" onclick="pickAvatar(this)">😊</div>
+      <div class="avatar-item" data-avatar="🥰" onclick="pickAvatar(this)">🥰</div>
+      <div class="avatar-item" data-avatar="😎" onclick="pickAvatar(this)">😎</div>
+      <div class="avatar-item" data-avatar="🐱" onclick="pickAvatar(this)">🐱</div>
+      <div class="avatar-item" data-avatar="🐶" onclick="pickAvatar(this)">🐶</div>
+      <div class="avatar-item" data-avatar="🌸" onclick="pickAvatar(this)">🌸</div>
+      <div class="avatar-item" data-avatar="⭐" onclick="pickAvatar(this)">⭐</div>
+      <div class="avatar-item" data-avatar="🍬" onclick="pickAvatar(this)">🍬</div>
+    </div>
+    <input type="text" id="edit-nickname" placeholder="你的昵称">
+    <button onclick="saveProfile()" style="width:100%;margin-top:8px;">保存</button>
+    <button class="secondary" style="width:100%;margin-top:8px;" onclick="closeProfileModal()">取消</button>
+  </div>
+</div>
+
+<!-- 修改标题弹窗 -->
+<div class="modal-mask" id="title-modal">
+  <div class="modal">
+    <h4>🏠 修改小屋标题</h4>
+    <input type="text" id="edit-title" placeholder="输入新的小屋标题">
+    <button onclick="saveTitle()" style="width:100%;margin-top:8px;">保存</button>
+    <button class="secondary" style="width:100%;margin-top:8px;" onclick="closeTitleModal()">取消</button>
   </div>
 </div>
 
@@ -515,6 +652,8 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null;
 let myProfile = null;
 let partnerProfile = null;
+let selectedMood = '';
+let selectedAvatar = '😊';
 
 // ===================== 初始化 =====================
 async function init() {
@@ -522,6 +661,7 @@ async function init() {
   if(currentUser){
     await loadMyProfile();
     await updateCoupleStatus();
+    await loadSiteTitle();
     loadDiaryList();
     loadFlowerStats();
     loadFlowerRecords();
@@ -534,18 +674,16 @@ async function init() {
 async function refreshUser(){
   const {data:{user}} = await sb.auth.getUser();
   currentUser = user;
-  const userDom = document.getElementById("user-info");
   const authPanel = document.getElementById("auth-panel");
   const mainContent = document.getElementById("main-content");
 
   if(user){
     authPanel.style.display = "none";
     mainContent.style.display = "block";
-    userDom.innerText = user.email.split('@')[0];
   }else{
     authPanel.style.display = "block";
     mainContent.style.display = "none";
-    userDom.innerText = "未登录";
+    document.getElementById("user-info").innerText = "未登录";
   }
 }
 
@@ -572,6 +710,12 @@ async function signOut(){
 async function loadMyProfile(){
   const {data} = await sb.from("profiles").select("*").eq("id", currentUser.id).single();
   myProfile = data;
+  selectedAvatar = myProfile.avatar || '😊';
+  
+  // 更新顶部显示
+  document.getElementById("user-avatar").innerText = selectedAvatar;
+  document.getElementById("user-info").innerText = myProfile.nickname || myProfile.email.split('@')[0];
+
   if(myProfile.partner_id){
     const {data: p} = await sb.from("profiles").select("*").eq("id", myProfile.partner_id).single();
     partnerProfile = p;
@@ -582,12 +726,13 @@ async function updateCoupleStatus(){
   const statusDom = document.getElementById("couple-status");
   if(partnerProfile){
     const name = partnerProfile.nickname || partnerProfile.email.split('@')[0];
-    statusDom.innerHTML = `<span>💑 已与 ${name} 绑定</span>`;
+    statusDom.innerHTML = `<span>💑 已与 ${partnerProfile.avatar || '😊'} ${name} 绑定</span>`;
   }else{
     statusDom.innerHTML = `<span>💑 尚未绑定伴侣</span>`;
   }
 }
 
+// 绑定伴侣
 function openBindModal(){
   if(!currentUser) return alert("请先登录");
   document.getElementById("bind-modal").classList.add("active");
@@ -601,7 +746,6 @@ async function bindPartner(){
   if(!email) return alert("请输入对方邮箱");
   if(email === myProfile.email) return alert("不能绑定自己哦");
 
-  // 查对方profile
   const {data: target, error} = await sb.from("profiles").select("*").eq("email", email).single();
   if(error || !target) return alert("找不到该用户，请确认对方已注册账号");
 
@@ -617,6 +761,70 @@ async function bindPartner(){
   loadFlowerStats();
 }
 
+// 编辑资料
+function openProfileModal(){
+  if(!currentUser) return;
+  document.getElementById("edit-nickname").value = myProfile.nickname || '';
+  // 高亮当前头像
+  document.querySelectorAll(".avatar-item").forEach(i=>i.classList.remove("active"));
+  document.querySelector(`.avatar-item[data-avatar="${selectedAvatar}"]`)?.classList.add("active");
+  document.getElementById("profile-modal").classList.add("active");
+}
+function closeProfileModal(){
+  document.getElementById("profile-modal").classList.remove("active");
+}
+
+function pickAvatar(dom){
+  document.querySelectorAll(".avatar-item").forEach(i=>i.classList.remove("active"));
+  dom.classList.add("active");
+  selectedAvatar = dom.dataset.avatar;
+}
+
+async function saveProfile(){
+  const nickname = document.getElementById("edit-nickname").value.trim();
+  const {error} = await sb.from("profiles").update({
+    nickname: nickname,
+    avatar: selectedAvatar
+  }).eq("id", currentUser.id);
+
+  if(error) return alert("保存失败："+error.message);
+  alert("✅ 资料保存成功！");
+  closeProfileModal();
+  await loadMyProfile();
+  loadDiaryList(); // 刷新日记里的作者信息
+}
+
+// ===================== 小屋标题 =====================
+async function loadSiteTitle(){
+  const {data} = await sb.from("couple_settings").select("title").limit(1).single();
+  if(data?.title){
+    document.getElementById("site-title").innerText = `💖 ${data.title}`;
+    document.getElementById("page-title").innerText = `💖 ${data.title}`;
+  }
+}
+
+function editTitle(){
+  if(!currentUser) return;
+  document.getElementById("edit-title").value = document.getElementById("site-title").innerText.replace('💖 ','');
+  document.getElementById("title-modal").classList.add("active");
+}
+function closeTitleModal(){
+  document.getElementById("title-modal").classList.remove("active");
+}
+
+async function saveTitle(){
+  const title = document.getElementById("edit-title").value.trim();
+  if(!title) return alert("标题不能为空");
+  
+  // 取第一条设置更新
+  const {data} = await sb.from("couple_settings").select("id").limit(1).single();
+  await sb.from("couple_settings").update({title}).eq("id", data.id);
+  
+  alert("✅ 标题修改成功！");
+  closeTitleModal();
+  loadSiteTitle();
+}
+
 // ===================== 主Tab切换 =====================
 document.querySelectorAll(".main-tab").forEach(tab=>{
   tab.onclick = function(){
@@ -628,33 +836,68 @@ document.querySelectorAll(".main-tab").forEach(tab=>{
   }
 })
 
-// ===================== 日记模块（双人共享） =====================
+// ===================== 日记模块 =====================
+function pickMood(dom){
+  document.querySelectorAll(".mood-item").forEach(i=>i.classList.remove("active"));
+  dom.classList.add("active");
+  selectedMood = dom.dataset.mood;
+}
+
 async function saveDiary(){
   if(!currentUser) return alert("请先登录");
   const content = document.getElementById("diary-content").value.trim();
-  const mood = document.getElementById("diary-mood").value.trim();
   if(!content) return alert("日记内容不能为空");
 
   const {error} = await sb.from("diaries").insert({
     author_id: currentUser.id,
     content: content,
-    mood: mood
+    mood: selectedMood
   })
   if(error) return alert("保存失败："+error.message);
   alert("✅日记保存成功！");
   document.getElementById("diary-content").value = "";
-  document.getElementById("diary-mood").value = "";
+  document.querySelectorAll(".mood-item").forEach(i=>i.classList.remove("active"));
+  selectedMood = '';
   loadDiaryList();
 }
 
 async function loadDiaryList(){
   if(!currentUser) return;
-  // 查自己+伴侣的所有日记，按时间倒序
+  // 手动指定关联条件：profiles.id = diaries.author_id
   const {data:list,error} = await sb.from("diaries")
-    .select("*, profiles!diaries_author_id_fkey(nickname, email)")
+    .select("*, profiles!profiles_diaries_author_id_fk(id, nickname, avatar, email)")
     .order("created_at",{ascending:false});
 
-  if(error) return console.error(error);
+  if(error){
+    // 外键名不对的兜底方案：分开查
+    const {data:diaryList} = await sb.from("diaries")
+      .select("*")
+      .order("created_at",{ascending:false});
+    
+    if(!diaryList?.length){
+      document.getElementById("diary-list").innerHTML = '<div class="empty">还没有日记，快去写第一篇吧～</div>';
+      return;
+    }
+
+    // 批量查作者资料
+    const authorIds = [...new Set(diaryList.map(d=>d.author_id))];
+    const {data: authors} = await sb.from("profiles").select("id,nickname,avatar").in("id", authorIds);
+    const authorMap = {};
+    authors.forEach(a=> authorMap[a.id] = a);
+
+    renderDiaryList(diaryList, authorMap);
+    return;
+  }
+
+  // 联表成功直接渲染
+  const authorMap = {};
+  list.forEach(item=>{
+    authorMap[item.author_id] = item.profiles;
+  });
+  renderDiaryList(list, authorMap);
+}
+
+function renderDiaryList(list, authorMap){
   const container = document.getElementById("diary-list");
   if(list.length === 0){
     container.innerHTML = '<div class="empty">还没有日记，快去写第一篇吧～</div>';
@@ -663,8 +906,9 @@ async function loadDiaryList(){
 
   container.innerHTML = list.map(item=>{
     const isMe = item.author_id === currentUser.id;
-    const name = item.profiles?.nickname || item.profiles?.email?.split('@')[0] || "匿名";
-    const firstChar = name.charAt(0).toUpperCase();
+    const author = authorMap[item.author_id] || {};
+    const name = author.nickname || author.email?.split('@')[0] || "匿名";
+    const avatar = author.avatar || '😊';
     const time = new Date(item.created_at).toLocaleString('zh-CN',{
       month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'
     });
@@ -672,7 +916,7 @@ async function loadDiaryList(){
     <div class="diary-item">
       <div class="diary-header">
         <div class="diary-author">
-          <div class="avatar ${isMe ? '' : 'other'}">${firstChar}</div>
+          <div class="avatar ${isMe ? '' : 'other'}">${avatar}</div>
           <span>${isMe ? '我' : name}</span>
         </div>
         <div class="diary-time">${time}</div>
@@ -718,53 +962,79 @@ async function sendFlower(){
 
 async function loadFlowerStats(){
   if(!currentUser) return;
+  // 收到的花
   const {data:received} = await sb.from("flower_records")
-    .select("amount").eq("receiver_id", currentUser.id);
+    .select("amount, type").eq("receiver_id", currentUser.id).eq("type", "send");
+  // 送出的花
   const {data:sent} = await sb.from("flower_records")
-    .select("amount").eq("sender_id", currentUser.id);
+    .select("amount").eq("sender_id", currentUser.id).eq("type", "send");
+  // 已兑换消耗
+  const {data:redeemed} = await sb.from("flower_records")
+    .select("amount").eq("receiver_id", currentUser.id).eq("type", "redeem");
 
-  const sum = (arr)=> arr.reduce((s,i)=>s+i.amount, 0);
-  document.getElementById("flower-received").innerText = sum(received || []);
-  document.getElementById("flower-sent").innerText = sum(sent || []);
+  const sum = (arr)=> arr.reduce((s,i)=>s + Number(i.amount), 0);
+  const totalReceived = sum(received || []);
+  const totalSent = sum(sent || []);
+  const totalRedeemed = sum(redeemed || []);
+  const balance = totalReceived - totalRedeemed;
+
+  document.getElementById("flower-received").innerText = totalReceived;
+  document.getElementById("flower-sent").innerText = totalSent;
+  document.getElementById("flower-balance").innerText = Math.max(0, balance);
 }
 
 async function loadFlowerRecords(){
   if(!currentUser) return;
   const {data:list,error} = await sb.from("flower_records")
-    .select("*, sender:profiles!flower_records_sender_id_fkey(email, nickname)")
+    .select("*, sender:profiles!flower_records_sender_id_fk(nickname, avatar)")
     .order("created_at",{ascending:false});
 
-  if(error) return console.error(error);
+  if(error) {
+    // 兜底方案
+    const {data:rawList} = await sb.from("flower_records")
+      .select("*").order("created_at",{ascending:false});
+    renderFlowerRecords(rawList);
+    return;
+  }
+  renderFlowerRecords(list);
+}
+
+function renderFlowerRecords(list){
   const container = document.getElementById("flower-list");
   if(list.length === 0){
-    container.innerHTML = '<div class="empty">暂无送花记录</div>';
+    container.innerHTML = '<div class="empty">暂无记录</div>';
     return;
   }
   container.innerHTML = list.map(item=>{
-    const isMe = item.sender_id === currentUser.id;
-    const name = isMe ? '我' : (item.sender?.nickname || item.sender?.email?.split('@')[0]);
+    const isMeSend = item.sender_id === currentUser.id;
+    const isRedeem = item.type === 'redeem';
     return `
     <div class="list-item">
       <div class="item-left">
-        <div class="item-title">${isMe ? '送出' : '收到'} ${item.amount} 朵小红花 🌸</div>
+        <div class="item-title">
+          ${isRedeem ? '🎁 兑换奖励' : (isMeSend ? '送出' : '收到')} ${item.amount} 朵小红花
+        </div>
         <div class="item-desc">${item.reward_text || '无备注'} · ${new Date(item.created_at).toLocaleDateString()}</div>
       </div>
     </div>
   `}).join('');
 }
 
-// ===================== 奖励池（共享） =====================
+// ===================== 奖励池 =====================
 async function addReward(){
   if(!currentUser) return alert("请先登录");
   const text = document.getElementById("reward-input").value.trim();
+  const cost = parseInt(document.getElementById("reward-cost").value) || 1;
   if(!text) return alert("请输入奖励内容");
 
   const {error} = await sb.from("reward_pool").insert({
     created_by: currentUser.id,
-    content: text
+    content: text,
+    flower_cost: cost
   })
   if(error) return alert("添加失败："+error.message);
   document.getElementById("reward-input").value = "";
+  document.getElementById("reward-cost").value = "5";
   loadRewardList();
 }
 
@@ -779,16 +1049,41 @@ async function loadRewardList(){
     container.innerHTML = '<div class="empty">奖励池空空的，快去添加吧～</div>';
     return;
   }
+
+  // 当前余额
+  const balance = Number(document.getElementById("flower-balance").innerText || 0);
+
   container.innerHTML = list.map(item=>`
     <div class="list-item">
       <div class="item-left">
         <div class="item-title">🎁 ${item.content}</div>
+        <div class="item-desc">需要 <span class="reward-cost">${item.flower_cost}</span> 朵小红花</div>
       </div>
       <div class="inline-btn">
+        <button class="mini-btn" onclick="redeemReward('${item.id}', ${item.flower_cost})" ${balance < item.flower_cost ? 'disabled' : ''}>兑换</button>
         <button class="mini-btn secondary" onclick="deleteReward('${item.id}')">删除</button>
       </div>
     </div>
   `).join('');
+}
+
+async function redeemReward(id, cost){
+  if(!confirm(`确定要用 ${cost} 朵小红花兑换这个奖励吗？`)) return;
+  
+  // 插入兑换记录
+  const {error} = await sb.from("flower_records").insert({
+    sender_id: currentUser.id,
+    receiver_id: currentUser.id,
+    type: "redeem",
+    amount: cost,
+    reward_text: "兑换奖励"
+  });
+
+  if(error) return alert("兑换失败："+error.message);
+  alert("🎉 兑换成功！快去兑现奖励吧～");
+  loadFlowerStats();
+  loadRewardList();
+  loadFlowerRecords();
 }
 
 async function deleteReward(id){
