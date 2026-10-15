@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="我们的恋爱小屋">
+<title>💖 我们的恋爱小屋</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont, sans-serif;}
+body{background:#fff5f8;color:#444;padding:16px;max-width:600px;margin:0 auto;}
+.header{text-align:center;padding:20px 0;}
+.header h1{color:#d86b8c;font-size:24px;}
+.tab-bar{display:flex;gap:4px;margin:20px 0;background:#fce4ec;border-radius:12px;padding:4px;}
+.tab{flex:1;text-align:center;padding:10px;border-radius:10px;cursor:pointer;font-weight:500;color:#888;}
+.tab.active{background:white;color:#d86b8c;}
+.page{display:none;}
+.page.active{display:block;}
+.card{background:white;border-radius:16px;padding:16px;margin-bottom:16px;box-shadow:0 2px 8px #00000010;}
+input,textarea,select{width:100%;padding:10px;border:1px solid #f2d7df;border-radius:10px;margin:8px 0;font-size:16px;}
+button{background:#d86b8c;color:white;border:none;padding:10px 14px;border-radius:10px;font-size:16px;cursor:pointer;margin:4px;}
+button.secondary{background:#b8b8b8;}
+button.success{background:#52c41a;}
+.flower-count{font-size:32px;text-align:center;color:#d86b8c;margin:10px 0;}
+.item{padding:10px;border-bottom:1px solid #f8e8ec;}
+.item:last-child{border-bottom:none;}
+.login-wrap{margin-top:40px;}
+.hide{display:none !important;}
+</style>
+</head>
+<body>
+<div class="header">
+<h1>💖 我们的恋爱小屋</h1>
+<div id="userInfo" class="hide"></div>
+</div>
+
+<!-- 登录面板 -->
+<div id="loginPage" class="login-wrap">
+<div class="card">
+<h3>登录 / 注册</h3>
+<input type="email" id="loginEmail" placeholder="邮箱">
+<input type="password" id="loginPwd" placeholder="密码">
+<input type="text" id="loginNickname" placeholder="你的昵称（注册填写）">
+<button onclick="signUp()">注册</button>
+<button onclick="signIn()">登录</button>
+<button onclick="signOut()" class="secondary">退出登录</button>
+</div>
+</div>
+
+<!-- 主程序面板（登录后显示） -->
+<div id="mainApp" class="hide">
+<div class="tab-bar">
+<div class="tab active" data-target="diary">生活日记</div>
+<div class="tab" data-target="flower">小红花奖励</div>
+<div class="tab" data-target="wish">许愿礼物</div>
+</div>
+
+<!-- 日记 -->
+<div class="page active" id="diary">
+<div class="card">
+<h3>📝 写新日记</h3>
+<textarea id="diaryContent" placeholder="记录今天的小故事..." rows="3"></textarea>
+<input type="text" id="diaryMood" placeholder="心情标签：开心/甜蜜">
+<button onclick="addDiary()">保存日记</button>
+</div>
+<div class="card">
+<h3>📖 时光记录</h3>
+<div id="diaryList"></div>
+</div>
+</div>
+
+<!-- 小红花 -->
+<div class="page" id="flower">
+<div class="card">
+<h3>🌸 我的小红花余额</h3>
+<div class="flower-count"><span id="myFlowerNum">0</span> / 5 兑换奖励</div>
+<select id="sendTarget">
+<option value="">选择赠送对象</option>
+</select>
+<button onclick="sendFlower()">赠送1朵小红花</button>
+<button onclick="exchangeReward()">兑换奖励（消耗5朵）</button>
+</div>
+<div class="card">
+<h3>🎁 公共奖励池</h3>
+<input type="text" id="rewardInput" placeholder="添加奖励，例如：帮我捏肩">
+<button onclick="addReward()">添加奖励</button>
+<div id="rewardList"></div>
+</div>
+<div class="card">
+<h3>📜 小红花流水记录</h3>
+<div id="flowerLog"></div>
+</div>
+</div>
+
+<!-- 愿望 -->
+<div class="page" id="wish">
+<div class="card">
+<h3>✨ 添加愿望</h3>
+<input type="text" id="wishText" placeholder="写下想要的礼物">
+<input type="date" id="wishDeadline">
+<button onclick="addWish()">保存愿望</button>
+</div>
+<div class="card">
+<h3>🎀 愿望清单</h3>
+<div id="wishList"></div>
+</div>
+</div>
+</div>
+
+<script>
+// ========== 【这里替换成你自己Supabase的信息！！】 =========
+const SUPABASE_URL = "https://bxiiapjcghlvyfgpfjhi.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_mQ_pZNPxV_lOYTGmVBzojg_27dBUx1G";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+let allUsers = [];
+
+// Tab切换
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.onclick = ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    const target = tab.dataset.target;
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.getElementById(target).classList.add('active');
+  }
+})
+
+// 登录状态监听
+async function init(){
+  const {data:{session}} = await supabase.auth.getSession();
+  if(session){
+    currentUser = session.user;
+    showApp();
+    await loadAllUsers();
+    await renderAll();
+    subscribeRealtime();
+  }else{
+    showLogin();
+  }
+}
+
+function showLogin(){
+  document.getElementById('loginPage').classList.remove('hide');
+  document.getElementById('mainApp').classList.add('hide');
+  document.getElementById('userInfo').classList.add('hide');
+}
+function showApp(){
+  document.getElementById('loginPage').classList.add('hide');
+  document.getElementById('mainApp').classList.remove('hide');
+  document.getElementById('userInfo').classList.remove('hide');
+}
+
+// 注册
+async function signUp(){
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPwd").value.trim();
+  const nickname = document.getElementById("loginNickname").value.trim();
+  if(!email || !password || !nickname) return alert("邮箱、密码、昵称不能为空");
+  const {data,error} = await supabase.auth.signUp({
+    email,password,
+    options:{data:{nickname}}
+  });
+  if(error) alert(error.message);
+  else alert("注册成功，请去邮箱验证！");
+}
+// 登录
+async function signIn(){
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPwd").value.trim();
+  const {data,error} = await supabase.auth.signInWithPassword({email,password});
+  if(error) return alert(error.message);
+  currentUser = data.user;
+  showApp();
+  await loadAllUsers();
+  await renderAll();
+  subscribeRealtime();
+}
+// 登出
+async function signOut(){
+  await supabase.auth.signOut();
+  currentUser=null;
+  showLogin();
+}
+
+// 加载全部用户（用于赠送小红花下拉框）
+async function loadAllUsers(){
+  const {data,error} = await supabase.from("profiles").select("id,nickname");
+  if(error) return console.error(error);
+  allUsers = data;
+  const sel = document.getElementById("sendTarget");
+  sel.innerHTML = `<option value="">选择赠送对象</option>`;
+  data.forEach(u=>{
+    if(u.id !== currentUser.id){
+      sel.innerHTML += `<option value="${u.id}">${u.nickname}</option>`
+    }
+  })
+  // 显示当前用户昵称
+  const me = data.find(x=>x.id === currentUser.id);
+  document.getElementById("userInfo").innerText = `当前登录：${me?.nickname}`;
+}
+
+// ========== 日记 =========
+async function addDiary(){
+  const content = document.getElementById("diaryContent").value.trim();
+  const mood = document.getElementById("diaryMood").value.trim() || "普通";
+  if(!content) return alert("请输入日记");
+  const {error} = await supabase.from("diaries").insert([{
+    author_id:currentUser.id, content,mood
+  }]);
+  if(error) alert(error.message);
+  document.getElementById("diaryContent").value="";
+}
+async function renderDiary(){
+  const {data,error} = await supabase
+    .from("diaries")
+    .select(`*, profiles:author_id(nickname)`)
+    .order("created_at",{asc:false});
+  if(error) return console.error(error);
+  const dom = document.getElementById("diaryList");
+  dom.innerHTML = "";
+  data.forEach(item=>{
+    const div = document.createElement("div");
+    div.className="item";
+    const time = new Date(item.created_at).toLocaleString();
+    div.innerHTML = `<div>${item.profiles.nickname}｜${time}【${item.mood}】</div><div>${item.content}</div>`;
+    dom.appendChild(div);
+  })
+}
+
+// ========== 小红花 =========
+async function sendFlower(){
+  const receiver_id = document.getElementById("sendTarget").value;
+  if(!receiver_id) return alert("请选择赠送对象");
+  const {error} = await supabase.from("flower_records").insert([{
+    sender_id:currentUser.id, receiver_id, type:"send", amount:1
+  }]);
+  if(error) alert(error.message);
+}
+async function exchangeReward(){
+  // 查询我的花朵余额
+  const {data:balanceData} = await supabase.from("user_flower_balance").select("total_flowers").eq("uid",currentUser.id).single();
+  const myFlower = balanceData?.total_flowers || 0;
+  if(myFlower <5) return alert("小红花不足5朵，无法兑换");
+  // 获取奖励池随机一条
+  const {data:rewards} = await supabase.from("reward_pool").select("id,content");
+  if(!rewards || rewards.length ===0) return alert("奖励池为空，请先添加奖励");
+  const randomReward = rewards[Math.floor(Math.random()*rewards.length)];
+  // 插入兑换记录（扣5朵）
+  const {error} = await supabase.from("flower_records").insert([{
+    sender_id:currentUser.id, receiver_id:currentUser.id, type:"exchange", amount:5, reward_text:randomReward.content
+  }]);
+  if(error) return alert(error.message);
+  alert(`🎉兑换成功！奖励：${randomReward.content}`);
+}
+async function renderFlower(){
+  const {data:balanceData} = await supabase.from("user_flower_balance").select("total_flowers").eq("uid",currentUser.id).single();
+  const myFlower = balanceData?.total_flowers || 0;
+  document.getElementById("myFlowerNum").innerText = myFlower;
+
+  const {data:logs} = await supabase
+    .from("flower_records")
+    .select(`*, s:sender_id(nickname), r:receiver_id(nickname)`)
+    .order("created_at",{asc:false});
+  const logDom = document.getElementById("flowerLog");
+  logDom.innerHTML="";
+  logs.forEach(l=>{
+    const div = document.createElement("div");
+    div.className="item";
+    const t = new Date(l.created_at).toLocaleString();
+    if(l.type === "send"){
+      div.innerText = `${t} ${l.s.nickname} 送给 ${l.r.nickname} 🌸1朵小红花`;
+    }else{
+      div.innerText = `${t} ${l.r.nickname} 兑换奖励【${l.reward_text}】消耗5朵`;
+    }
+    logDom.appendChild(div);
+  })
+}
+
+// ========== 奖励池 =========
+async function addReward(){
+  const val = document.getElementById("rewardInput").value.trim();
+  if(!val) return;
+  const {error} = await supabase.from("reward_pool").insert([{
+    content:val, created_by:currentUser.id
+  }]);
+  if(error) alert(error.message);
+  document.getElementById("rewardInput").value="";
+}
+async function renderReward(){
+  const {data,error} = await supabase.from("reward_pool").select(`*, profiles:created_by(nickname)`);
+  if(error) return;
+  const dom = document.getElementById("rewardList");
+  dom.innerHTML="";
+  data.forEach(r=>{
+    const div = document.createElement("div");
+    div.className="item";
+    div.innerHTML = `${r.content}（${r.profiles.nickname}添加）`;
+    dom.appendChild(div);
+  })
+}
+
+// ========== 愿望清单 =========
+async function addWish(){
+  const text = document.getElementById("wishText").value.trim();
+  const deadline = document.getElementById("wishDeadline").value;
+  if(!text) return alert("请填写愿望");
+  const {error} = await supabase.from("wish_list").insert([{
+    creator_id:currentUser.id, content:text, deadline
+  }]);
+  if(error) alert(error.message);
+  document.getElementById("wishText").value="";
+}
+async function renderWish(){
+  const {data,error} = await supabase.from("wish_list")
+    .select(`*, profiles:creator_id(nickname)`)
+    .order("created_at",{asc:false});
+  if(error) return;
+  const dom = document.getElementById("wishList");
+  dom.innerHTML="";
+  data.forEach((w,i)=>{
+    const div = document.createElement("div");
+    div.className="item";
+    const status = w.done ? "✅已完成" : "⏳待实现";
+    div.innerHTML = `
+      <div>${w.profiles.nickname}：${w.content} ${status}</div>
+      <div>截止日期：${w.deadline || "无"}</div>
+      ${!w.done ? `<button onclick="finishWish('${w.id}')">标记完成</button>`:""}
+    `;
+    dom.appendChild(div);
+  })
+}
+async function finishWish(wishId){
+  const {error} = await supabase.from("wish_list").update({done:true}).eq("id",wishId);
+  if(error) alert(error.message);
+}
+
+// 统一渲染全部页面
+async function renderAll(){
+  await renderDiary();
+  await renderFlower();
+  await renderReward();
+  await renderWish();
+}
+
+// 实时订阅：数据库变化自动刷新页面（双人实时同步核心）
+function subscribeRealtime(){
+  supabase.channel('love-app-channel')
+    .on('postgres_changes', {event:'*', schema:'public', table:'diaries'}, renderAll)
+    .on('postgres_changes', {event:'*', schema:'public', table:'flower_records'}, renderAll)
+    .on('postgres_changes', {event:'*', schema:'public', table:'reward_pool'}, renderAll)
+    .on('postgres_changes', {event:'*', schema:'public', table:'wish_list'}, renderAll)
+    .subscribe();
+}
+
+// 启动
+init();
+</script>
+</body>
+</html>
