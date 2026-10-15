@@ -55,7 +55,15 @@
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
+    }
+    .avatar-img {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
     .bind-btn {
       background: #fff;
@@ -65,6 +73,16 @@
       border-radius: 20px;
       font-size: 13px;
       cursor: pointer;
+    }
+    .reset-btn {
+      background: #fff;
+      color: #999;
+      border: 1px solid #eee;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      cursor: pointer;
+      margin-left: 6px;
     }
 
     /* 登录面板 */
@@ -110,6 +128,9 @@
     textarea {
       resize: vertical;
       min-height: 100px;
+    }
+    input[type="file"] {
+      display: none;
     }
 
     /* 按钮通用 */
@@ -229,6 +250,104 @@
       background: #ffe6f0;
     }
 
+    /* 日记筛选Tab */
+    .diary-filter {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 14px;
+      border-bottom: 2px solid #f8e1eb;
+    }
+    .filter-tab {
+      padding: 8px 16px;
+      cursor: pointer;
+      color: #888;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -2px;
+      font-size: 14px;
+    }
+    .filter-tab.active {
+      color: #d63384;
+      border-bottom-color: #d63384;
+      font-weight: 500;
+    }
+    .view-toggle {
+      display: flex;
+      gap: 6px;
+      margin-left: auto;
+    }
+    .view-btn {
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: #f5f5f5;
+      border: none;
+      cursor: pointer;
+      font-size: 12px;
+      color: #666;
+    }
+    .view-btn.active {
+      background: #d63384;
+      color: #fff;
+    }
+
+    /* 日历 */
+    .calendar {
+      margin-bottom: 16px;
+    }
+    .calendar-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .calendar-header button {
+      padding: 4px 12px;
+      font-size: 14px;
+      background: #f5e6ed;
+      color: #d63384;
+    }
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+    .calendar-day {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .calendar-day:hover {
+      background: #fff0f5;
+    }
+    .calendar-day.today {
+      border: 2px solid #d63384;
+      font-weight: bold;
+    }
+    .calendar-day.has-diary {
+      background: #ffe6f0;
+      color: #d63384;
+      font-weight: bold;
+    }
+    .calendar-day.selected {
+      background: #d63384;
+      color: #fff;
+    }
+    .calendar-day.other-month {
+      color: #ccc;
+    }
+    .week-header {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      text-align: center;
+      font-size: 12px;
+      color: #aaa;
+      margin-bottom: 6px;
+    }
+
     /* 日记项 */
     .diary-item {
       padding: 16px 0;
@@ -254,11 +373,14 @@
       width: 28px;
       height: 28px;
       border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid #fff;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       background: linear-gradient(135deg, #ffb3d1, #ff80ab);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 16px;
+      font-size: 14px;
     }
     .avatar.other {
       background: linear-gradient(135deg, #a8c8ff, #7aa7ff);
@@ -413,31 +535,28 @@
     }
 
     /* 头像选择 */
-    .avatar-picker {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin: 8px 0 16px;
-      justify-content: center;
+    .avatar-upload-area {
+      text-align: center;
+      margin-bottom: 16px;
     }
-    .avatar-item {
-      width: 48px;
-      height: 48px;
+    .avatar-preview {
+      width: 80px;
+      height: 80px;
       border-radius: 50%;
+      object-fit: cover;
+      margin: 0 auto 10px;
+      border: 3px solid #f8d0e0;
+      display: block;
       background: #fff0f5;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 26px;
+    }
+    .upload-btn {
+      background: #f5e6ed;
+      color: #d63384;
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 13px;
       cursor: pointer;
-      border: 2px solid transparent;
-      transition: all 0.2s;
-    }
-    .avatar-item:hover {
-      transform: scale(1.1);
-    }
-    .avatar-item.active {
-      border-color: #d63384;
+      display: inline-block;
     }
 
     /* 情侣状态 */
@@ -467,10 +586,12 @@
     <h1 id="site-title" onclick="editTitle()">💖 我们的恋爱小屋</h1>
     <div class="user-bar">
       <div class="user-info-click" onclick="openProfileModal()">
-        <span id="user-avatar">😊</span>
+        <img id="user-avatar-img" class="avatar-img" src="" style="display:none;">
+        <span id="user-avatar-emoji">😊</span>
         <span id="user-info">加载中...</span>
       </div>
       <button class="bind-btn" onclick="openBindModal()">绑定伴侣</button>
+      <button class="reset-btn" onclick="resetFlowers()">重置花</button>
     </div>
   </div>
 
@@ -519,7 +640,30 @@
       </div>
 
       <div class="card">
-        <h4>📖 双人时光记录</h4>
+        <div class="diary-filter">
+          <div class="filter-tab active" data-filter="all" onclick="filterDiary(this)">全部</div>
+          <div class="filter-tab" data-filter="me" onclick="filterDiary(this)">我的</div>
+          <div class="filter-tab" data-filter="her" onclick="filterDiary(this)">她的</div>
+          <div class="view-toggle">
+            <button class="view-btn active" data-view="list" onclick="switchView(this)">列表</button>
+            <button class="view-btn" data-view="calendar" onclick="switchView(this)">日历</button>
+          </div>
+        </div>
+
+        <!-- 日历视图 -->
+        <div class="calendar" id="calendar-view" style="display:none;">
+          <div class="calendar-header">
+            <button onclick="prevMonth()">‹</button>
+            <span id="calendar-month"></span>
+            <button onclick="nextMonth()">›</button>
+          </div>
+          <div class="week-header">
+            <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
+          </div>
+          <div class="calendar-grid" id="calendar-grid"></div>
+        </div>
+
+        <!-- 日记列表 -->
         <div id="diary-list">
           <div class="empty">加载中...</div>
         </div>
@@ -615,16 +759,12 @@
 <div class="modal-mask" id="profile-modal">
   <div class="modal">
     <h4>✨ 编辑我的资料</h4>
-    <p style="font-size:14px;color:#888;text-align:center;margin-bottom:8px;">选择头像</p>
-    <div class="avatar-picker" id="avatar-picker">
-      <div class="avatar-item" data-avatar="😊" onclick="pickAvatar(this)">😊</div>
-      <div class="avatar-item" data-avatar="🥰" onclick="pickAvatar(this)">🥰</div>
-      <div class="avatar-item" data-avatar="😎" onclick="pickAvatar(this)">😎</div>
-      <div class="avatar-item" data-avatar="🐱" onclick="pickAvatar(this)">🐱</div>
-      <div class="avatar-item" data-avatar="🐶" onclick="pickAvatar(this)">🐶</div>
-      <div class="avatar-item" data-avatar="🌸" onclick="pickAvatar(this)">🌸</div>
-      <div class="avatar-item" data-avatar="⭐" onclick="pickAvatar(this)">⭐</div>
-      <div class="avatar-item" data-avatar="🍬" onclick="pickAvatar(this)">🍬</div>
+    <div class="avatar-upload-area">
+      <img id="avatar-preview" class="avatar-preview" src="" alt="">
+      <label class="upload-btn">
+        上传头像
+        <input type="file" id="avatar-file" accept="image/*" onchange="previewAvatar(this)">
+      </label>
     </div>
     <input type="text" id="edit-nickname" placeholder="你的昵称">
     <button onclick="saveProfile()" style="width:100%;margin-top:8px;">保存</button>
@@ -653,7 +793,12 @@ let currentUser = null;
 let myProfile = null;
 let partnerProfile = null;
 let selectedMood = '';
-let selectedAvatar = '😊';
+let diaryFilter = 'all';
+let currentView = 'list';
+let currentMonth = new Date();
+let selectedDate = null;
+let allDiaryList = [];
+let authorMap = {};
 
 // ===================== 初始化 =====================
 async function init() {
@@ -662,7 +807,7 @@ async function init() {
     await loadMyProfile();
     await updateCoupleStatus();
     await loadSiteTitle();
-    loadDiaryList();
+    await loadAllDiaries();
     loadFlowerStats();
     loadFlowerRecords();
     loadRewardList();
@@ -710,10 +855,7 @@ async function signOut(){
 async function loadMyProfile(){
   const {data} = await sb.from("profiles").select("*").eq("id", currentUser.id).single();
   myProfile = data;
-  selectedAvatar = myProfile.avatar || '😊';
-  
-  // 更新顶部显示
-  document.getElementById("user-avatar").innerText = selectedAvatar;
+  updateAvatarDisplay();
   document.getElementById("user-info").innerText = myProfile.nickname || myProfile.email.split('@')[0];
 
   if(myProfile.partner_id){
@@ -722,11 +864,28 @@ async function loadMyProfile(){
   }
 }
 
+function updateAvatarDisplay(){
+  const imgDom = document.getElementById("user-avatar-img");
+  const emojiDom = document.getElementById("user-avatar-emoji");
+  if(myProfile.avatar && myProfile.avatar.startsWith('http')){
+    imgDom.src = myProfile.avatar;
+    imgDom.style.display = "inline";
+    emojiDom.style.display = "none";
+  }else{
+    imgDom.style.display = "none";
+    emojiDom.style.display = "inline";
+    emojiDom.innerText = myProfile.avatar || '😊';
+  }
+}
+
 async function updateCoupleStatus(){
   const statusDom = document.getElementById("couple-status");
   if(partnerProfile){
     const name = partnerProfile.nickname || partnerProfile.email.split('@')[0];
-    statusDom.innerHTML = `<span>💑 已与 ${partnerProfile.avatar || '😊'} ${name} 绑定</span>`;
+    const avatar = partnerProfile.avatar && partnerProfile.avatar.startsWith('http') 
+      ? `<img src="${partnerProfile.avatar}" style="width:18px;border-radius:50%;vertical-align:middle;">` 
+      : (partnerProfile.avatar || '😊');
+    statusDom.innerHTML = `<span>💑 已与 ${avatar} ${name} 绑定</span>`;
   }else{
     statusDom.innerHTML = `<span>💑 尚未绑定伴侣</span>`;
   }
@@ -749,7 +908,6 @@ async function bindPartner(){
   const {data: target, error} = await sb.from("profiles").select("*").eq("email", email).single();
   if(error || !target) return alert("找不到该用户，请确认对方已注册账号");
 
-  // 双向绑定
   await sb.from("profiles").update({partner_id: target.id}).eq("id", currentUser.id);
   await sb.from("profiles").update({partner_id: currentUser.id}).eq("id", target.id);
 
@@ -757,41 +915,64 @@ async function bindPartner(){
   closeBindModal();
   await loadMyProfile();
   await updateCoupleStatus();
-  loadDiaryList();
+  await loadAllDiaries();
   loadFlowerStats();
 }
 
-// 编辑资料
+// 编辑资料 & 头像上传
 function openProfileModal(){
   if(!currentUser) return;
   document.getElementById("edit-nickname").value = myProfile.nickname || '';
-  // 高亮当前头像
-  document.querySelectorAll(".avatar-item").forEach(i=>i.classList.remove("active"));
-  document.querySelector(`.avatar-item[data-avatar="${selectedAvatar}"]`)?.classList.add("active");
+  const preview = document.getElementById("avatar-preview");
+  if(myProfile.avatar && myProfile.avatar.startsWith('http')){
+    preview.src = myProfile.avatar;
+  }else{
+    preview.src = '';
+  }
   document.getElementById("profile-modal").classList.add("active");
 }
 function closeProfileModal(){
   document.getElementById("profile-modal").classList.remove("active");
 }
 
-function pickAvatar(dom){
-  document.querySelectorAll(".avatar-item").forEach(i=>i.classList.remove("active"));
-  dom.classList.add("active");
-  selectedAvatar = dom.dataset.avatar;
+function previewAvatar(input){
+  if(input.files && input.files[0]){
+    const reader = new FileReader();
+    reader.onload = e => document.getElementById("avatar-preview").src = e.target.result;
+    reader.readAsDataURL(input.files[0]);
+  }
 }
 
 async function saveProfile(){
   const nickname = document.getElementById("edit-nickname").value.trim();
+  const fileInput = document.getElementById("avatar-file");
+  let avatarUrl = myProfile.avatar;
+
+  // 上传新头像
+  if(fileInput.files && fileInput.files[0]){
+    const file = fileInput.files[0];
+    const fileName = `${currentUser.id}_${Date.now()}.${file.name.split('.').pop()}`;
+    
+    const {error} = await sb.storage
+      .from('avatars')
+      .upload(fileName, file, {upsert: true});
+    
+    if(error) return alert("头像上传失败："+error.message);
+    
+    const {data} = sb.storage.from('avatars').getPublicUrl(fileName);
+    avatarUrl = data.publicUrl;
+  }
+
   const {error} = await sb.from("profiles").update({
     nickname: nickname,
-    avatar: selectedAvatar
+    avatar: avatarUrl
   }).eq("id", currentUser.id);
 
   if(error) return alert("保存失败："+error.message);
   alert("✅ 资料保存成功！");
   closeProfileModal();
   await loadMyProfile();
-  loadDiaryList(); // 刷新日记里的作者信息
+  await loadAllDiaries();
 }
 
 // ===================== 小屋标题 =====================
@@ -816,7 +997,6 @@ async function saveTitle(){
   const title = document.getElementById("edit-title").value.trim();
   if(!title) return alert("标题不能为空");
   
-  // 取第一条设置更新
   const {data} = await sb.from("couple_settings").select("id").limit(1).single();
   await sb.from("couple_settings").update({title}).eq("id", data.id);
   
@@ -858,49 +1038,73 @@ async function saveDiary(){
   document.getElementById("diary-content").value = "";
   document.querySelectorAll(".mood-item").forEach(i=>i.classList.remove("active"));
   selectedMood = '';
-  loadDiaryList();
+  await loadAllDiaries();
 }
 
-async function loadDiaryList(){
+// 加载全部日记（缓存）
+async function loadAllDiaries(){
   if(!currentUser) return;
-  // 手动指定关联条件：profiles.id = diaries.author_id
-  const {data:list,error} = await sb.from("diaries")
-    .select("*, profiles!profiles_diaries_author_id_fk(id, nickname, avatar, email)")
+  const {data:list} = await sb.from("diaries")
+    .select("*")
     .order("created_at",{ascending:false});
 
-  if(error){
-    // 外键名不对的兜底方案：分开查
-    const {data:diaryList} = await sb.from("diaries")
-      .select("*")
-      .order("created_at",{ascending:false});
-    
-    if(!diaryList?.length){
-      document.getElementById("diary-list").innerHTML = '<div class="empty">还没有日记，快去写第一篇吧～</div>';
-      return;
-    }
+  allDiaryList = list || [];
+  
+  // 批量查作者
+  const authorIds = [...new Set(allDiaryList.map(d=>d.author_id))];
+  const {data: authors} = await sb.from("profiles").select("id,nickname,avatar").in("id", authorIds);
+  authorMap = {};
+  authors.forEach(a=> authorMap[a.id] = a);
 
-    // 批量查作者资料
-    const authorIds = [...new Set(diaryList.map(d=>d.author_id))];
-    const {data: authors} = await sb.from("profiles").select("id,nickname,avatar").in("id", authorIds);
-    const authorMap = {};
-    authors.forEach(a=> authorMap[a.id] = a);
-
-    renderDiaryList(diaryList, authorMap);
-    return;
-  }
-
-  // 联表成功直接渲染
-  const authorMap = {};
-  list.forEach(item=>{
-    authorMap[item.author_id] = item.profiles;
-  });
-  renderDiaryList(list, authorMap);
+  renderDiaryList();
+  renderCalendar();
 }
 
-function renderDiaryList(list, authorMap){
+// 筛选切换
+function filterDiary(dom){
+  document.querySelectorAll(".filter-tab").forEach(t=>t.classList.remove("active"));
+  dom.classList.add("active");
+  diaryFilter = dom.dataset.filter;
+  renderDiaryList();
+}
+
+// 视图切换
+function switchView(dom){
+  document.querySelectorAll(".view-btn").forEach(b=>b.classList.remove("active"));
+  dom.classList.add("active");
+  currentView = dom.dataset.view;
+  
+  if(currentView === 'calendar'){
+    document.getElementById("calendar-view").style.display = "block";
+    document.getElementById("diary-list").style.display = "none";
+    renderCalendar();
+  }else{
+    document.getElementById("calendar-view").style.display = "none";
+    document.getElementById("diary-list").style.display = "block";
+    renderDiaryList();
+  }
+}
+
+// 渲染日记列表
+function renderDiaryList(){
+  let list = allDiaryList;
+  
+  // 筛选
+  if(diaryFilter === 'me'){
+    list = list.filter(d=>d.author_id === currentUser.id);
+  }else if(diaryFilter === 'her'){
+    list = list.filter(d=>d.author_id !== currentUser.id);
+  }
+
+  // 日期筛选（日历选中时）
+  if(selectedDate){
+    const dateStr = selectedDate.toISOString().split('T')[0];
+    list = list.filter(d=> d.created_at.startsWith(dateStr));
+  }
+
   const container = document.getElementById("diary-list");
   if(list.length === 0){
-    container.innerHTML = '<div class="empty">还没有日记，快去写第一篇吧～</div>';
+    container.innerHTML = '<div class="empty">暂无日记记录</div>';
     return;
   }
 
@@ -908,15 +1112,23 @@ function renderDiaryList(list, authorMap){
     const isMe = item.author_id === currentUser.id;
     const author = authorMap[item.author_id] || {};
     const name = author.nickname || author.email?.split('@')[0] || "匿名";
-    const avatar = author.avatar || '😊';
+    const avatar = author.avatar;
     const time = new Date(item.created_at).toLocaleString('zh-CN',{
       month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'
     });
+
+    let avatarHtml = '';
+    if(avatar && avatar.startsWith('http')){
+      avatarHtml = `<img class="avatar ${isMe ? '' : 'other'}" src="${avatar}">`;
+    }else{
+      avatarHtml = `<div class="avatar ${isMe ? '' : 'other'}">${avatar || '😊'}</div>`;
+    }
+
     return `
     <div class="diary-item">
       <div class="diary-header">
         <div class="diary-author">
-          <div class="avatar ${isMe ? '' : 'other'}">${avatar}</div>
+          ${avatarHtml}
           <span>${isMe ? '我' : name}</span>
         </div>
         <div class="diary-time">${time}</div>
@@ -926,6 +1138,63 @@ function renderDiaryList(list, authorMap){
     </div>
     `
   }).join('');
+}
+
+// ===================== 日历视图 =====================
+function prevMonth(){
+  currentMonth.setMonth(currentMonth.getMonth()-1);
+  renderCalendar();
+}
+function nextMonth(){
+  currentMonth.setMonth(currentMonth.getMonth()+1);
+  renderCalendar();
+}
+
+function renderCalendar(){
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  document.getElementById("calendar-month").innerText = `${year}年${month+1}月`;
+
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month+1, 0);
+  const startWeek = firstDay.getDay();
+  const totalDays = lastDay.getDate();
+
+  // 有日记的日期集合
+  const diaryDates = new Set(
+    allDiaryList.map(d=> new Date(d.created_at).toISOString().split('T')[0])
+  );
+
+  let html = '';
+  // 上月占位
+  for(let i=0; i<startWeek; i++){
+    html += `<div class="calendar-day other-month"></div>`;
+  }
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  
+  for(let day=1; day<=totalDays; day++){
+    const date = new Date(year, month, day);
+    const dateStr = date.toISOString().split('T')[0];
+    let classes = 'calendar-day';
+    
+    if(dateStr === todayStr) classes += ' today';
+    if(diaryDates.has(dateStr)) classes += ' has-diary';
+    if(selectedDate && dateStr === selectedDate.toISOString().split('T')[0]) classes += ' selected';
+
+    html += `<div class="${classes}" onclick="selectDate('${dateStr}')">${day}</div>`;
+  }
+
+  document.getElementById("calendar-grid").innerHTML = html;
+}
+
+function selectDate(dateStr){
+  selectedDate = new Date(dateStr);
+  renderCalendar();
+  // 切换到列表视图并筛选当天
+  if(currentView === 'calendar'){
+    document.querySelector('.view-btn[data-view="list"]').click();
+  }
 }
 
 // ===================== 小红花子Tab切换 =====================
@@ -960,15 +1229,22 @@ async function sendFlower(){
   loadFlowerRecords();
 }
 
+// 重置小红花
+async function resetFlowers(){
+  if(!confirm("确定要清空所有小红花记录吗？此操作不可恢复！")) return;
+  await sb.from("flower_records").delete().or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`);
+  alert("✅ 小红花已重置");
+  loadFlowerStats();
+  loadFlowerRecords();
+  loadRewardList();
+}
+
 async function loadFlowerStats(){
   if(!currentUser) return;
-  // 收到的花
   const {data:received} = await sb.from("flower_records")
     .select("amount, type").eq("receiver_id", currentUser.id).eq("type", "send");
-  // 送出的花
   const {data:sent} = await sb.from("flower_records")
     .select("amount").eq("sender_id", currentUser.id).eq("type", "send");
-  // 已兑换消耗
   const {data:redeemed} = await sb.from("flower_records")
     .select("amount").eq("receiver_id", currentUser.id).eq("type", "redeem");
 
@@ -985,21 +1261,10 @@ async function loadFlowerStats(){
 
 async function loadFlowerRecords(){
   if(!currentUser) return;
-  const {data:list,error} = await sb.from("flower_records")
-    .select("*, sender:profiles!flower_records_sender_id_fk(nickname, avatar)")
+  const {data:list} = await sb.from("flower_records")
+    .select("*")
     .order("created_at",{ascending:false});
 
-  if(error) {
-    // 兜底方案
-    const {data:rawList} = await sb.from("flower_records")
-      .select("*").order("created_at",{ascending:false});
-    renderFlowerRecords(rawList);
-    return;
-  }
-  renderFlowerRecords(list);
-}
-
-function renderFlowerRecords(list){
   const container = document.getElementById("flower-list");
   if(list.length === 0){
     container.innerHTML = '<div class="empty">暂无记录</div>';
@@ -1040,17 +1305,15 @@ async function addReward(){
 
 async function loadRewardList(){
   if(!currentUser) return;
-  const {data:list,error} = await sb.from("reward_pool")
+  const {data:list} = await sb.from("reward_pool")
     .select("*").order("created_at",{ascending:false});
 
-  if(error) return console.error(error);
   const container = document.getElementById("reward-list");
   if(list.length === 0){
     container.innerHTML = '<div class="empty">奖励池空空的，快去添加吧～</div>';
     return;
   }
 
-  // 当前余额
   const balance = Number(document.getElementById("flower-balance").innerText || 0);
 
   container.innerHTML = list.map(item=>`
@@ -1070,7 +1333,6 @@ async function loadRewardList(){
 async function redeemReward(id, cost){
   if(!confirm(`确定要用 ${cost} 朵小红花兑换这个奖励吗？`)) return;
   
-  // 插入兑换记录
   const {error} = await sb.from("flower_records").insert({
     sender_id: currentUser.id,
     receiver_id: currentUser.id,
@@ -1092,7 +1354,7 @@ async function deleteReward(id){
   loadRewardList();
 }
 
-// ===================== 许愿清单（共享） =====================
+// ===================== 许愿清单 =====================
 document.querySelectorAll(".sub-tab[data-wish]").forEach(tab=>{
   tab.onclick = function(){
     document.querySelectorAll(".sub-tab[data-wish]").forEach(t=>t.classList.remove("active"));
@@ -1123,11 +1385,10 @@ async function loadWishList(){
   const activeTab = document.querySelector(".sub-tab[data-wish].active").dataset.wish;
   const isDone = activeTab === "done";
 
-  const {data:list,error} = await sb.from("wish_list")
+  const {data:list} = await sb.from("wish_list")
     .select("*").eq("done", isDone)
     .order("created_at",{ascending:false});
 
-  if(error) return console.error(error);
   const container = document.getElementById("wish-list");
   if(list.length === 0){
     container.innerHTML = `<div class="empty">${isDone ? '还没有实现的愿望' : '暂无待实现愿望'}</div>`;
