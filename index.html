@@ -1324,7 +1324,7 @@ function toggleComment(diaryId){
 // 加载评论
 async function loadComments(diaryId){
   const {data:list} = await sb.from("diaries_comments")
-    .select("*, user:profiles!diaries_comments_user_id_fkey(nickname)")
+    .select("*")
     .eq("diary_id", diaryId)
     .order("created_at");
 
@@ -1334,13 +1334,22 @@ async function loadComments(diaryId){
     return;
   }
 
-  container.innerHTML = list.map(c=>`
+  // 手动匹配评论者昵称，不依赖外键
+  const userIds = [...new Set(list.map(c => c.user_id))];
+  const {data: users} = await sb.from("profiles").select("id,nickname").in("id", userIds);
+  const userMap = {};
+  users.forEach(u => userMap[u.id] = u);
+
+  container.innerHTML = list.map(c => {
+    const name = userMap[c.user_id]?.nickname || '匿名';
+    return `
     <div class="comment-item">
-      <span class="comment-author">${c.user?.nickname || '匿名'}：</span>
+      <span class="comment-author">${name}：</span>
       <span class="comment-content">${c.content}</span>
     </div>
-  `).join('');
+  `}).join('');
 }
+
 
 // 发送评论
 async function sendComment(diaryId){
