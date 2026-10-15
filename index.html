@@ -162,6 +162,16 @@
       cursor: not-allowed;
       transform: none;
     }
+    button.text-btn {
+      background: none;
+      color: #d63384;
+      padding: 4px 8px;
+      font-size: 13px;
+      box-shadow: none;
+    }
+    button.text-btn:hover {
+      background: #fff0f5;
+    }
 
     /* 主Tab */
     .main-tabs {
@@ -319,6 +329,7 @@
       font-size: 14px;
       cursor: pointer;
       transition: all 0.2s;
+      color: #bbb; /* 无日记默认灰色 */
     }
     .calendar-day:hover {
       background: #fff0f5;
@@ -326,18 +337,28 @@
     .calendar-day.today {
       border: 2px solid #d63384;
       font-weight: bold;
+      color: #d63384;
     }
     .calendar-day.has-diary {
-      background: #ffe6f0;
-      color: #d63384;
-      font-weight: bold;
+      color: #333; /* 有日记黑色 */
+      font-weight: 500;
+      position: relative;
+    }
+    .calendar-day.has-diary::after {
+      content: '';
+      position: absolute;
+      bottom: 4px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #d63384;
     }
     .calendar-day.selected {
       background: #d63384;
-      color: #fff;
+      color: #fff !important;
     }
     .calendar-day.other-month {
-      color: #ccc;
+      color: #eee;
     }
     .week-header {
       display: grid;
@@ -403,6 +424,74 @@
       color: #555;
       font-size: 15px;
       white-space: pre-wrap;
+      margin-bottom: 10px;
+    }
+    .diary-actions {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      font-size: 13px;
+      color: #999;
+    }
+    .action-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .action-item:hover {
+      color: #d63384;
+    }
+    .action-item.liked {
+      color: #d63384;
+    }
+    .action-item.danger:hover {
+      color: #ff4d4f;
+    }
+
+    /* 评论区 */
+    .comment-section {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid #f7e8ef;
+      display: none;
+    }
+    .comment-section.open {
+      display: block;
+    }
+    .comment-list {
+      margin-bottom: 10px;
+    }
+    .comment-item {
+      padding: 8px 0;
+      font-size: 14px;
+      display: flex;
+      gap: 8px;
+    }
+    .comment-author {
+      color: #d63384;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+    .comment-content {
+      color: #555;
+      flex: 1;
+    }
+    .comment-input-box {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .comment-input-box input {
+      flex: 1;
+      margin: 0;
+      padding: 8px 12px;
+      font-size: 14px;
+    }
+    .comment-input-box button {
+      padding: 8px 16px;
+      font-size: 14px;
     }
 
     /* 子标签 */
@@ -591,7 +680,7 @@
         <span id="user-info">加载中...</span>
       </div>
       <button class="bind-btn" onclick="openBindModal()">绑定伴侣</button>
-      <button class="reset-btn" onclick="resetFlowers()">重置花</button>
+      <button class="reset-btn" onclick="openResetModal()">重置花</button>
     </div>
   </div>
 
@@ -642,8 +731,8 @@
       <div class="card">
         <div class="diary-filter">
           <div class="filter-tab active" data-filter="all" onclick="filterDiary(this)">全部</div>
-          <div class="filter-tab" data-filter="me" onclick="filterDiary(this)">我的</div>
-          <div class="filter-tab" data-filter="her" onclick="filterDiary(this)">她的</div>
+          <div class="filter-tab" data-filter="me" onclick="filterDiary(this)" id="filter-me">我的</div>
+          <div class="filter-tab" data-filter="her" onclick="filterDiary(this)" id="filter-her">她的</div>
           <div class="view-toggle">
             <button class="view-btn active" data-view="list" onclick="switchView(this)">列表</button>
             <button class="view-btn" data-view="calendar" onclick="switchView(this)">日历</button>
@@ -755,6 +844,20 @@
   </div>
 </div>
 
+<!-- 重置小红花弹窗（双重验证） -->
+<div class="modal-mask" id="reset-modal">
+  <div class="modal">
+    <h4>⚠️ 重置小红花</h4>
+    <p style="font-size:13px;color:#999;margin-bottom:12px;text-align:center;">需要双方都输入密码确认才能重置</p>
+    <input type="email" id="reset-email1" placeholder="你的邮箱">
+    <input type="password" id="reset-pwd1" placeholder="你的密码">
+    <input type="email" id="reset-email2" placeholder="TA的邮箱">
+    <input type="password" id="reset-pwd2" placeholder="TA的密码">
+    <button onclick="confirmReset()" style="width:100%;margin-top:8px;">确认重置</button>
+    <button class="secondary" style="width:100%;margin-top:8px;" onclick="closeResetModal()">取消</button>
+  </div>
+</div>
+
 <!-- 编辑资料弹窗 -->
 <div class="modal-mask" id="profile-modal">
   <div class="modal">
@@ -799,6 +902,7 @@ let currentMonth = new Date();
 let selectedDate = null;
 let allDiaryList = [];
 let authorMap = {};
+let likeMap = {};
 
 // ===================== 初始化 =====================
 async function init() {
@@ -806,6 +910,7 @@ async function init() {
   if(currentUser){
     await loadMyProfile();
     await updateCoupleStatus();
+    await updateFilterLabels(); // 更新筛选标签昵称
     await loadSiteTitle();
     await loadAllDiaries();
     loadFlowerStats();
@@ -891,6 +996,14 @@ async function updateCoupleStatus(){
   }
 }
 
+// 更新筛选标签为昵称
+async function updateFilterLabels(){
+  const myName = myProfile.nickname || '我';
+  const herName = partnerProfile?.nickname || 'TA';
+  document.getElementById("filter-me").innerText = myName;
+  document.getElementById("filter-her").innerText = herName;
+}
+
 // 绑定伴侣
 function openBindModal(){
   if(!currentUser) return alert("请先登录");
@@ -915,6 +1028,7 @@ async function bindPartner(){
   closeBindModal();
   await loadMyProfile();
   await updateCoupleStatus();
+  await updateFilterLabels();
   await loadAllDiaries();
   loadFlowerStats();
 }
@@ -948,7 +1062,6 @@ async function saveProfile(){
   const fileInput = document.getElementById("avatar-file");
   let avatarUrl = myProfile.avatar;
 
-  // 上传新头像
   if(fileInput.files && fileInput.files[0]){
     const file = fileInput.files[0];
     const fileName = `${currentUser.id}_${Date.now()}.${file.name.split('.').pop()}`;
@@ -972,6 +1085,7 @@ async function saveProfile(){
   alert("✅ 资料保存成功！");
   closeProfileModal();
   await loadMyProfile();
+  await updateFilterLabels();
   await loadAllDiaries();
 }
 
@@ -1041,7 +1155,7 @@ async function saveDiary(){
   await loadAllDiaries();
 }
 
-// 加载全部日记（缓存）
+// 加载全部日记
 async function loadAllDiaries(){
   if(!currentUser) return;
   const {data:list} = await sb.from("diaries")
@@ -1055,6 +1169,14 @@ async function loadAllDiaries(){
   const {data: authors} = await sb.from("profiles").select("id,nickname,avatar").in("id", authorIds);
   authorMap = {};
   authors.forEach(a=> authorMap[a.id] = a);
+
+  // 批量查点赞状态
+  const {data: likes} = await sb.from("diaries_likes").select("diary_id,user_id").in("user_id", authorIds);
+  likeMap = {};
+  likes.forEach(l=>{
+    if(!likeMap[l.diary_id]) likeMap[l.diary_id] = [];
+    likeMap[l.diary_id].push(l.user_id);
+  });
 
   renderDiaryList();
   renderCalendar();
@@ -1096,7 +1218,7 @@ function renderDiaryList(){
     list = list.filter(d=>d.author_id !== currentUser.id);
   }
 
-  // 日期筛选（日历选中时）
+  // 日期筛选
   if(selectedDate){
     const dateStr = selectedDate.toISOString().split('T')[0];
     list = list.filter(d=> d.created_at.startsWith(dateStr));
@@ -1116,6 +1238,8 @@ function renderDiaryList(){
     const time = new Date(item.created_at).toLocaleString('zh-CN',{
       month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'
     });
+    const liked = likeMap[item.id]?.includes(currentUser.id);
+    const likeCount = likeMap[item.id]?.length || 0;
 
     let avatarHtml = '';
     if(avatar && avatar.startsWith('http')){
@@ -1125,7 +1249,7 @@ function renderDiaryList(){
     }
 
     return `
-    <div class="diary-item">
+    <div class="diary-item" id="diary-${item.id}">
       <div class="diary-header">
         <div class="diary-author">
           ${avatarHtml}
@@ -1135,9 +1259,104 @@ function renderDiaryList(){
       </div>
       ${item.mood ? `<div class="mood-tag">${item.mood}</div>` : ''}
       <div class="diary-content">${item.content}</div>
+      <div class="diary-actions">
+        <div class="action-item ${liked ? 'liked' : ''}" onclick="toggleLike('${item.id}')">
+          ❤️ <span>${likeCount}</span>
+        </div>
+        <div class="action-item" onclick="toggleComment('${item.id}')">
+          💬 评论
+        </div>
+        ${isMe ? `<div class="action-item danger" onclick="deleteDiary('${item.id}')">🗑️ 删除</div>` : ''}
+      </div>
+      <div class="comment-section" id="comment-${item.id}">
+        <div class="comment-list" id="comment-list-${item.id}">
+          <div class="empty" style="padding:10px 0;">暂无评论</div>
+        </div>
+        <div class="comment-input-box">
+          <input type="text" placeholder="写下你的评论..." id="comment-input-${item.id}">
+          <button onclick="sendComment('${item.id}')">发送</button>
+        </div>
+      </div>
     </div>
     `
   }).join('');
+}
+
+// 点赞
+async function toggleLike(diaryId){
+  const liked = likeMap[diaryId]?.includes(currentUser.id);
+  
+  if(liked){
+    // 取消点赞
+    await sb.from("diaries_likes").delete()
+      .eq("diary_id", diaryId).eq("user_id", currentUser.id);
+    likeMap[diaryId] = likeMap[diaryId].filter(id=>id !== currentUser.id);
+  }else{
+    // 点赞
+    await sb.from("diaries_likes").insert({
+      diary_id: diaryId,
+      user_id: currentUser.id
+    });
+    if(!likeMap[diaryId]) likeMap[diaryId] = [];
+    likeMap[diaryId].push(currentUser.id);
+  }
+  
+  renderDiaryList();
+}
+
+// 删除日记
+async function deleteDiary(diaryId){
+  if(!confirm("确定删除这条日记吗？")) return;
+  await sb.from("diaries").delete().eq("id", diaryId);
+  alert("删除成功");
+  await loadAllDiaries();
+}
+
+// 展开/收起评论
+function toggleComment(diaryId){
+  const section = document.getElementById(`comment-${diaryId}`);
+  section.classList.toggle("open");
+  if(section.classList.contains("open")){
+    loadComments(diaryId);
+  }
+}
+
+// 加载评论
+async function loadComments(diaryId){
+  const {data:list} = await sb.from("diaries_comments")
+    .select("*, user:profiles!diaries_comments_user_id_fkey(nickname)")
+    .eq("diary_id", diaryId)
+    .order("created_at");
+
+  const container = document.getElementById(`comment-list-${diaryId}`);
+  if(!list?.length){
+    container.innerHTML = '<div class="empty" style="padding:10px 0;">暂无评论</div>';
+    return;
+  }
+
+  container.innerHTML = list.map(c=>`
+    <div class="comment-item">
+      <span class="comment-author">${c.user?.nickname || '匿名'}：</span>
+      <span class="comment-content">${c.content}</span>
+    </div>
+  `).join('');
+}
+
+// 发送评论
+async function sendComment(diaryId){
+  const input = document.getElementById(`comment-input-${diaryId}`);
+  const content = input.value.trim();
+  if(!content) return;
+
+  const {error} = await sb.from("diaries_comments").insert({
+    diary_id: diaryId,
+    user_id: currentUser.id,
+    content: content
+  });
+
+  if(error) return alert("评论失败："+error.message);
+  input.value = '';
+  loadComments(diaryId);
 }
 
 // ===================== 日历视图 =====================
@@ -1191,7 +1410,6 @@ function renderCalendar(){
 function selectDate(dateStr){
   selectedDate = new Date(dateStr);
   renderCalendar();
-  // 切换到列表视图并筛选当天
   if(currentView === 'calendar'){
     document.querySelector('.view-btn[data-view="list"]').click();
   }
@@ -1229,11 +1447,43 @@ async function sendFlower(){
   loadFlowerRecords();
 }
 
-// 重置小红花
-async function resetFlowers(){
-  if(!confirm("确定要清空所有小红花记录吗？此操作不可恢复！")) return;
-  await sb.from("flower_records").delete().or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`);
+// ========== 重置小红花（双重密码验证） ==========
+function openResetModal(){
+  if(!currentUser) return alert("请先登录");
+  if(!partnerProfile) return alert("请先绑定伴侣");
+  document.getElementById("reset-email1").value = myProfile.email;
+  document.getElementById("reset-email2").value = partnerProfile.email;
+  document.getElementById("reset-modal").classList.add("active");
+}
+function closeResetModal(){
+  document.getElementById("reset-modal").classList.remove("active");
+}
+
+async function confirmReset(){
+  const email1 = document.getElementById("reset-email1").value.trim();
+  const pwd1 = document.getElementById("reset-pwd1").value;
+  const email2 = document.getElementById("reset-email2").value.trim();
+  const pwd2 = document.getElementById("reset-pwd2").value;
+
+  if(!email1 || !pwd1 || !email2 || !pwd2) return alert("请填写完整信息");
+
+  // 验证第一个账号
+  const { error: err1 } = await sb.auth.signInWithPassword({email: email1, password: pwd1});
+  if(err1) return alert("第一个账号密码错误");
+
+  // 验证第二个账号
+  const { error: err2 } = await sb.auth.signInWithPassword({email: email2, password: pwd2});
+  if(err2) return alert("第二个账号密码错误");
+
+  // 都验证通过，执行重置
+  await sb.from("flower_records").delete()
+    .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`);
+
+  // 重新登录自己
+  await sb.auth.signInWithPassword({email: myProfile.email, password: pwd1});
+  
   alert("✅ 小红花已重置");
+  closeResetModal();
   loadFlowerStats();
   loadFlowerRecords();
   loadRewardList();
