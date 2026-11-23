@@ -687,6 +687,7 @@
   <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="timer-feature.css">
   <link rel="stylesheet" href="album-feature.css">
+  <link rel="stylesheet" href="mood.css">
 </head>
 <body>
 <div class="container">
@@ -739,14 +740,7 @@
         <h4>✍️ 写新日记</h4>
         <textarea id="diary-content" placeholder="记录今天的小故事..."></textarea>
         <p style="font-size:14px;color:#888;margin:8px 0 4px;">今日心情</p>
-        <div class="mood-picker" id="mood-picker">
-          <div class="mood-item" data-mood="开心" onclick="pickMood(this)">😊</div>
-          <div class="mood-item" data-mood="幸福" onclick="pickMood(this)">🥰</div>
-          <div class="mood-item" data-mood="难过" onclick="pickMood(this)">😢</div>
-          <div class="mood-item" data-mood="生气" onclick="pickMood(this)">😠</div>
-          <div class="mood-item" data-mood="失落" onclick="pickMood(this)">😔</div>
-          <div class="mood-item" data-mood="惊喜" onclick="pickMood(this)">🎉</div>
-        </div>
+        <div class="mood-picker" id="mood-picker" role="group" aria-label="选择今日心情"></div>
         <button onclick="saveDiary()" style="width:100%;margin-top:6px;">保存日记</button>
       </div>
 
@@ -804,7 +798,7 @@
       <div class="card">
         <div class="sub-tabs">
           <div class="sub-tab active" data-sub="send">送TA小红花</div>
-          <div class="sub-tab" data-sub="records">收支记录</div>
+          <div class="sub-tab" data-sub="records">送花记录</div>
           <div class="sub-tab" data-sub="reward">奖励池</div>
         </div>
 
@@ -830,6 +824,8 @@
           <div id="reward-list">
             <div class="empty">暂无奖励</div>
           </div>
+          <div class="reward-history-heading">兑换记录</div>
+          <div id="reward-history"><div class="empty">暂无兑换记录</div></div>
         </div>
       </div>
     </div>
@@ -919,6 +915,7 @@
 
 <script src="timer-feature.js"></script>
 <script src="album-feature.js"></script>
+<script src="flower-feature.js"></script>
 <script>
 // ===================== Supabase 配置 =====================
 const SUPABASE_URL = "https://bxiiapjcghlvyfgpfjhi.supabase.co";
@@ -1183,9 +1180,27 @@ document.querySelectorAll(".main-tab").forEach(tab=>{
 })
 
 // ===================== 日记模块 =====================
+// Each mood uses the same hand-drawn face, with expressions matching saved values.
+const moodFaces = {
+  '开心': '<path d="M8 10h.01M16 10h.01M8.5 14c.8 2 2 3 3.5 3s2.7-1 3.5-3"/>',
+  '幸福': '<path d="M7.7 10.1c.7-.9 1.6-.9 2.3 0M14 10.1c.7-.9 1.6-.9 2.3 0M9 14.2c.7 1.6 1.7 2.3 3 2.3s2.3-.7 3-2.3"/><path d="M18 5.3c-.5-.7-1.7-.7-2.1.3-.4-1-1.6-1-2.1-.3-.8 1.2.9 2.3 2.1 3.1 1.2-.8 2.9-1.9 2.1-3.1Z"/>',
+  '难过': '<path d="M8 10h.01M16 10h.01M9 17c.8-1.5 1.8-2.2 3-2.2s2.2.7 3 2.2M7.5 12.5v1.3"/>',
+  '生气': '<path d="m6.8 8.4 2.5 1M17.2 8.4l-2.5 1M8.2 11h.01M15.8 11h.01M9 16c1-.7 2-.9 3-.9s2 .2 3 .9"/>',
+  '失落': '<path d="M7.3 10.2c.8.6 1.6.6 2.4 0M14.3 10.2c.8.6 1.6.6 2.4 0M9.4 16.2c.8-.7 1.7-1 2.6-1 .9 0 1.8.3 2.6 1"/>',
+  '惊喜': '<path d="M8 10h.01M16 10h.01"/><ellipse cx="12" cy="15.3" rx="1.7" ry="2.1"/>'
+};
+function moodIcon(mood) {
+  if (!moodFaces[mood]) return '';
+  return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.2"/>${moodFaces[mood]}</svg>`;
+}
+document.getElementById('mood-picker').innerHTML = Object.keys(moodFaces).map(mood =>
+  `<button type="button" class="mood-item" data-mood="${mood}" aria-label="${mood}" aria-pressed="false" onclick="pickMood(this)">${moodIcon(mood)}<span>${mood}</span></button>`).join('');
+
+
 function pickMood(dom){
-  document.querySelectorAll(".mood-item").forEach(i=>i.classList.remove("active"));
+  document.querySelectorAll(".mood-item").forEach(i=>{ i.classList.remove("active"); i.setAttribute("aria-pressed", "false"); });
   dom.classList.add("active");
+  dom.setAttribute("aria-pressed", "true");
   selectedMood = dom.dataset.mood;
 }
 
@@ -1202,7 +1217,7 @@ async function saveDiary(){
   if(error) return alert("保存失败："+error.message);
   alert("✅日记保存成功！");
   document.getElementById("diary-content").value = "";
-  document.querySelectorAll(".mood-item").forEach(i=>i.classList.remove("active"));
+  document.querySelectorAll(".mood-item").forEach(i=>{ i.classList.remove("active"); i.setAttribute("aria-pressed", "false"); });
   selectedMood = '';
   await loadAllDiaries();
 }
@@ -1223,7 +1238,7 @@ async function loadAllDiaries(){
   (authors || []).forEach(a=> authorMap[a.id] = a);
 
   // 批量查点赞状态
-  const {data: likes} = await sb.from("diaries_likes").select("diary_id,user_id").in("user_id", authorIds);
+  const {data: likes} = await sb.from("diaries_likes").select("diary_id,user_id").in("diary_id", allDiaryList.map(d => d.id));
   likeMap = {};
   (likes || []).forEach(l=>{
     if(!likeMap[l.diary_id]) likeMap[l.diary_id] = [];
@@ -1309,16 +1324,12 @@ function renderDiaryList(){
         </div>
         <div class="diary-time">${time}</div>
       </div>
-      ${item.mood ? `<div class="mood-tag">${escapeHtml(item.mood)}</div>` : ''}
+      ${moodFaces[item.mood] ? `<span class="mood-tag" aria-label="心情：${escapeHtml(item.mood)}">${moodIcon(item.mood)}</span>` : ''}
       <div class="diary-content">${escapeHtml(item.content)}</div>
       <div class="diary-actions">
-        <div class="action-item ${liked ? 'liked' : ''}" onclick="toggleLike('${item.id}')">
-          ❤️ <span>${likeCount}</span>
-        </div>
-        <div class="action-item" onclick="toggleComment('${item.id}')">
-          💬 评论
-        </div>
-        ${isMe ? `<div class="action-item danger" onclick="deleteDiary('${item.id}')">🗑️ 删除</div>` : ''}
+        <button type="button" class="interaction-btn ${liked ? 'liked' : ''}" aria-pressed="${!!liked}" onclick="toggleLike('${item.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.3C5 7 9.1 5.9 12 9c2.9-3.1 7-2 7 1.7C19 15.6 12 20 12 20Z"/></svg><span>${liked ? '已赞' : '赞'}${likeCount ? ' · '+likeCount : ''}</span></button>
+        <button type="button" class="interaction-btn" onclick="toggleComment('${item.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5h16v11H10l-4 3v-3H4z"/></svg><span>评论</span></button>
+        ${isMe ? `<button type="button" class="interaction-btn diary-delete" onclick="deleteDiary('${item.id}')">删除</button>` : ''}
       </div>
       <div class="comment-section" id="comment-${item.id}">
         <div class="comment-list" id="comment-list-${item.id}">
@@ -1337,22 +1348,12 @@ function renderDiaryList(){
 // 点赞
 async function toggleLike(diaryId){
   const liked = likeMap[diaryId]?.includes(currentUser.id);
-  
-  if(liked){
-    // 取消点赞
-    await sb.from("diaries_likes").delete()
-      .eq("diary_id", diaryId).eq("user_id", currentUser.id);
-    likeMap[diaryId] = likeMap[diaryId].filter(id=>id !== currentUser.id);
-  }else{
-    // 点赞
-    await sb.from("diaries_likes").insert({
-      diary_id: diaryId,
-      user_id: currentUser.id
-    });
-    if(!likeMap[diaryId]) likeMap[diaryId] = [];
-    likeMap[diaryId].push(currentUser.id);
-  }
-  
+  const result = liked
+    ? await sb.from("diaries_likes").delete().eq("diary_id", diaryId).eq("user_id", currentUser.id)
+    : await sb.from("diaries_likes").insert({diary_id:diaryId,user_id:currentUser.id});
+  if(result.error) return alert("操作失败，请稍后重试。");
+  if(liked) likeMap[diaryId] = (likeMap[diaryId] || []).filter(id => id !== currentUser.id);
+  else (likeMap[diaryId] ||= []).push(currentUser.id);
   renderDiaryList();
 }
 
@@ -1370,6 +1371,7 @@ function toggleComment(diaryId){
   section.classList.toggle("open");
   if(section.classList.contains("open")){
     loadComments(diaryId);
+    document.getElementById(`comment-input-${diaryId}`).focus();
   }
 }
 
@@ -1555,29 +1557,7 @@ async function loadFlowerStats(){
 }
 
 async function loadFlowerRecords(){
-  if(!currentUser) return;
-  const {data:list} = await sb.from("flower_records")
-    .select("*")
-    .order("created_at",{ascending:false});
-
-  const container = document.getElementById("flower-list");
-  if(list.length === 0){
-    container.innerHTML = '<div class="empty">暂无记录</div>';
-    return;
-  }
-  container.innerHTML = list.map(item=>{
-    const isMeSend = item.sender_id === currentUser.id;
-    const isRedeem = item.type === 'redeem';
-    return `
-    <div class="list-item">
-      <div class="item-left">
-        <div class="item-title">
-          ${isRedeem ? '🎁 兑换奖励' : (isMeSend ? '送出' : '收到')} ${item.amount} 朵小红花
-        </div>
-        <div class="item-desc">${escapeHtml(item.reward_text || '无备注')} · ${new Date(item.created_at).toLocaleDateString()}</div>
-      </div>
-    </div>
-  `}).join('');
+  return renderFlowerRecords();
 }
 
 // ===================== 奖励池 =====================
@@ -1626,21 +1606,7 @@ async function loadRewardList(){
 }
 
 async function redeemReward(id, cost){
-  if(!confirm(`确定要用 ${cost} 朵小红花兑换这个奖励吗？`)) return;
-  
-  const {error} = await sb.from("flower_records").insert({
-    sender_id: currentUser.id,
-    receiver_id: currentUser.id,
-    type: "redeem",
-    amount: cost,
-    reward_text: "兑换奖励"
-  });
-
-  if(error) return alert("兑换失败："+error.message);
-  alert("🎉 兑换成功！快去兑现奖励吧～");
-  loadFlowerStats();
-  loadRewardList();
-  loadFlowerRecords();
+  return redeemFlowerReward(id, cost);
 }
 
 async function deleteReward(id){

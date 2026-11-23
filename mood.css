@@ -1,0 +1,25 @@
+/* A calm, tactile mood selector and compact diary interactions. */
+.mood-picker { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:5px; margin:10px 0 18px; }
+.mood-item { display:flex; flex-direction:column; justify-content:center; align-items:center; gap:4px; width:100%; height:auto; min-width:0; min-height:66px; padding:7px 2px; border:1px solid transparent; border-radius:12px; color:#72676e; background:#f8f7f6; box-shadow:none; }
+.mood-item svg { display:block; width:28px; height:28px; flex:none; }
+.mood-item span { font-size:12px; line-height:1.2; white-space:nowrap; }
+.mood-item:hover { color:#725765; background:#f2eeee; transform:none; box-shadow:none; }
+.mood-item.active, .mood-item[aria-pressed="true"] { color:#76566b; border-color:#c7aeb9; background:#f4eaee; }
+.mood-item:focus-visible { outline:2px solid #806a79; outline-offset:2px; }
+.mood-tag { display:inline-flex; vertical-align:middle; padding:4px; border-radius:50%; background:#f3ecef; color:#7f6372; margin:0 0 8px; }
+.mood-tag svg { display:block; width:21px; height:21px; }
+.diary-actions { display:flex; gap:6px; align-items:center; margin-top:10px; }
+.interaction-btn { display:inline-flex; align-items:center; justify-content:center; gap:5px; min-height:38px; padding:6px 10px; border:0; border-radius:8px; color:#64776d; background:#f2f5f2; font-size:13px; font-weight:500; box-shadow:none; }
+.interaction-btn svg { width:18px; height:18px; flex:none; }
+.interaction-btn:hover { color:#435c4d; background:#e8efea; box-shadow:none; transform:none; }
+.interaction-btn.liked { color:#4d805f; background:#eaf3ec; }
+.interaction-btn.liked svg { fill:#82b792; }
+.interaction-btn.diary-delete { margin-left:auto; background:transparent; color:#a3a7a3; }
+.comment-section { margin-top:12px; padding:12px; border:0; border-radius:10px; background:#f3f5f3; }
+.comment-item { padding:6px 0; font-size:14px; line-height:1.55; }
+.comment-author { color:#5c7768; }
+.comment-content { color:#4e5551; font-size:14px; line-height:1.55; }
+.comment-input-box input { background:#fff; border-color:#e3e9e3; }
+.comment-input-box button { color:#fff; background:#678570; }
+.comment-input-box button:hover { background:#526e5b; }
+@media(max-width:350px){.mood-picker{gap:3px}.mood-item{min-height:62px}.mood-item svg{width:25px;height:25px}.mood-item span{font-size:12px}}

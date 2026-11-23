@@ -233,3 +233,38 @@ button.text-btn:hover { background: #f4f0f3; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* Mobile-first refinements: readable text and comfortable touch targets. */
+@media (max-width:600px) {
+  body { padding:18px 14px calc(40px + env(safe-area-inset-bottom)); font-size:16px; }
+  .header { gap:12px; padding:0 2px 16px; margin-bottom:16px; }
+  .header h1 { font-size:clamp(23px,7vw,27px); line-height:1.25; }
+  .user-bar { width:100%; gap:7px; }
+  .user-info-click { min-height:38px; margin-right:auto; }
+  .bind-btn, .reset-btn { min-height:38px; padding:7px 10px; font-size:13px; }
+  .couple-status { margin-bottom:14px; padding:10px 13px; border-radius:10px; }
+  .main-tabs { position:sticky; top:0; z-index:5; gap:5px; padding:9px 0; margin-bottom:14px; background:rgba(243,244,242,.96); border-bottom:1px solid #dde1de; scrollbar-width:none; }
+  .main-tabs::-webkit-scrollbar, .sub-tabs::-webkit-scrollbar { display:none; }
+  .main-tab { min-height:42px; padding:8px 13px; border-radius:10px; font-size:14px; }
+  .card { padding:20px 17px; margin-bottom:12px; border-radius:15px; }
+  .card h4 { margin-bottom:14px; font-size:18px; }
+  .auth-card { border-radius:16px; }
+  .diary-filter { flex-wrap:nowrap; gap:0; align-items:center; }
+  .filter-tab { padding:10px 9px; white-space:nowrap; }
+  .view-toggle { gap:4px; }
+  .view-btn { min-height:36px; padding:6px 9px; }
+  .diary-header { align-items:flex-start; }
+  .diary-content { line-height:1.75; font-size:15.5px; }
+  .comment-input-box input { min-width:0; min-height:42px; font-size:16px; }
+  .comment-input-box button { min-height:42px; padding:7px 12px; }
+  .flower-stats { gap:7px; }
+  .stat-box, .stat-box.balance { border-radius:10px; }
+  .stat-label { font-size:12px; }
+  .sub-tabs { scrollbar-width:none; }
+  .sub-tab { padding:10px 12px; }
+  .item-title { font-size:15px; }
+  .item-desc { line-height:1.5; font-size:13px; }
+  .mini-btn { min-height:40px; padding:7px 10px; }
+  .modal-mask { padding:16px; }
+  .modal { border-radius:16px; }
+}
