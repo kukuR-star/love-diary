@@ -684,6 +684,9 @@
   color: #ff4d4f;
 }
   </style>
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="timer-feature.css">
+  <link rel="stylesheet" href="album-feature.css">
 </head>
 <body>
 <div class="container">
@@ -695,8 +698,9 @@
         <span id="user-avatar-emoji">😊</span>
         <span id="user-info">加载中...</span>
       </div>
-      <button class="bind-btn" onclick="openBindModal()">绑定伴侣</button>
-      <button class="reset-btn" onclick="openResetModal()">重置花</button>
+      <button class="bind-btn" id="bind-btn" style="display:none" onclick="openBindModal()">绑定伴侣</button>
+      <button class="reset-btn" id="reset-btn" style="display:none" onclick="openResetModal()">重置花</button>
+      <button class="reset-btn" id="logout-btn" style="display:none" onclick="signOut()">退出登录</button>
     </div>
   </div>
 
@@ -709,7 +713,6 @@
       <button onclick="signIn()">登录</button>
       <button class="secondary" onclick="signUp()">注册</button>
     </div>
-    <button class="secondary" style="width:100%;margin-top:10px;" onclick="signOut()">退出登录</button>
   </div>
 
   <!-- 主内容 -->
@@ -720,11 +723,14 @@
       <span>💑 尚未绑定伴侣，点击右上角绑定</span>
     </div>
 
+    <div id="milestones-root"></div>
+
     <!-- 主Tab -->
     <div class="main-tabs">
       <button class="main-tab active" data-tab="diary">📝 生活日记</button>
       <button class="main-tab" data-tab="flower">🌸 小红花奖励</button>
       <button class="main-tab" data-tab="wish">🎁 许愿礼物</button>
+      <button class="main-tab" data-tab="album">相册</button>
     </div>
 
     <!-- ========== 日记面板 ========== -->
@@ -846,6 +852,16 @@
       </div>
     </div>
 
+    <div class="panel" id="panel-album">
+      <div class="card">
+        <div class="album-intro">
+          <div><h4>我们的私密相册</h4><p>为只属于你们的片刻，留一个位置。</p></div>
+          <label class="album-upload">添加照片或视频<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,video/mp4,video/quicktime,video/webm" onchange="uploadAlbumFile(this)"></label>
+        </div>
+        <p class="album-status" id="album-status" role="status" aria-live="polite">打开相册后加载</p>
+        <div class="album-grid" id="album-grid"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -901,6 +917,8 @@
   </div>
 </div>
 
+<script src="timer-feature.js"></script>
+<script src="album-feature.js"></script>
 <script>
 // ===================== Supabase 配置 =====================
 const SUPABASE_URL = "https://bxiiapjcghlvyfgpfjhi.supabase.co";
@@ -920,29 +938,43 @@ let allDiaryList = [];
 let authorMap = {};
 let likeMap = {};
 
+// 所有用户提供的文本在插入 HTML 前转义。
+function escapeHtml(value){
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[ch]));
+}
+function safeImageUrl(value){
+  try { const url = new URL(value); return url.protocol === 'https:' ? escapeHtml(url.href) : ''; }
+  catch { return ''; }
+}
+
 // ===================== 初始化 =====================
 async function init() {
   await refreshUser();
   if(currentUser){
+    try {
     await loadMyProfile();
     await updateCoupleStatus();
     await updateFilterLabels(); // 更新筛选标签昵称
     await loadSiteTitle();
     await loadAllDiaries();
-    loadFlowerStats();
-    loadFlowerRecords();
-    loadRewardList();
-    loadWishList();
+    await loadFlowerStats();
+    await Promise.all([loadFlowerRecords(), loadRewardList(), loadWishList(), initMilestones()]);
+    } catch (error) {
+      console.error('初始化失败', error);
+      alert('登录成功，但资料或数据加载失败。请检查网络后刷新页面；如持续发生，请联系管理员检查账号资料和数据库权限。');
+    }
   }
 }
 
 // ===================== 登录注册 =====================
 async function refreshUser(){
-  const {data:{user}} = await sb.auth.getUser();
+  const {data:{user}, error} = await sb.auth.getUser();
+  if (error && error.name !== "AuthSessionMissingError") throw new Error("无法验证登录状态，请检查网络后重试。");
   currentUser = user;
   const authPanel = document.getElementById("auth-panel");
   const mainContent = document.getElementById("main-content");
 
+  for (const id of ["logout-btn", "bind-btn", "reset-btn"]) document.getElementById(id).style.display = user ? "inline-block" : "none";
   if(user){
     authPanel.style.display = "none";
     mainContent.style.display = "block";
@@ -954,14 +986,14 @@ async function refreshUser(){
 }
 
 async function signIn(){
-  const email = document.getElementById("login-email").value;
+  const email = document.getElementById("login-email").value.trim();
   const password = document.getElementById("login-pwd").value;
   const {error} = await sb.auth.signInWithPassword({email,password});
   if(error) return alert(error.message);
   await init();
 }
 async function signUp(){
-  const email = document.getElementById("login-email").value;
+  const email = document.getElementById("login-email").value.trim();
   const password = document.getElementById("login-pwd").value;
   const {error} = await sb.auth.signUp({email,password});
   if(error) return alert(error.message);
@@ -974,8 +1006,10 @@ async function signOut(){
 
 // ===================== 个人资料 & 情侣绑定 =====================
 async function loadMyProfile(){
-  const {data} = await sb.from("profiles").select("*").eq("id", currentUser.id).single();
+  const {data, error} = await sb.from("profiles").select("*").eq("id", currentUser.id).single();
+  if (error || !data) throw new Error("无法加载账号资料");
   myProfile = data;
+  partnerProfile = null;
   updateAvatarDisplay();
   document.getElementById("user-info").innerText = myProfile.nickname || myProfile.email.split('@')[0];
 
@@ -1003,10 +1037,11 @@ async function updateCoupleStatus(){
   const statusDom = document.getElementById("couple-status");
   if(partnerProfile){
     const name = partnerProfile.nickname || partnerProfile.email.split('@')[0];
-    const avatar = partnerProfile.avatar && partnerProfile.avatar.startsWith('http') 
-      ? `<img src="${partnerProfile.avatar}" style="width:18px;border-radius:50%;vertical-align:middle;">` 
-      : (partnerProfile.avatar || '😊');
-    statusDom.innerHTML = `<span>💑 已与 ${avatar} ${name} 绑定</span>`;
+    const avatarUrl = safeImageUrl(partnerProfile.avatar);
+    const avatar = avatarUrl 
+      ? `<img src="${avatarUrl}" style="width:18px;border-radius:50%;vertical-align:middle;">` 
+      : escapeHtml(partnerProfile.avatar || '😊');
+    statusDom.innerHTML = `<span>💑 已与 ${avatar} ${escapeHtml(name)} 绑定</span>`;
   }else{
     statusDom.innerHTML = `<span>💑 尚未绑定伴侣</span>`;
   }
@@ -1143,6 +1178,7 @@ document.querySelectorAll(".main-tab").forEach(tab=>{
     document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
     this.classList.add("active");
     document.getElementById("panel-"+name).classList.add("active");
+    if (name === "album") loadAlbum();
   }
 })
 
@@ -1184,12 +1220,12 @@ async function loadAllDiaries(){
   const authorIds = [...new Set(allDiaryList.map(d=>d.author_id))];
   const {data: authors} = await sb.from("profiles").select("id,nickname,avatar").in("id", authorIds);
   authorMap = {};
-  authors.forEach(a=> authorMap[a.id] = a);
+  (authors || []).forEach(a=> authorMap[a.id] = a);
 
   // 批量查点赞状态
   const {data: likes} = await sb.from("diaries_likes").select("diary_id,user_id").in("user_id", authorIds);
   likeMap = {};
-  likes.forEach(l=>{
+  (likes || []).forEach(l=>{
     if(!likeMap[l.diary_id]) likeMap[l.diary_id] = [];
     likeMap[l.diary_id].push(l.user_id);
   });
@@ -1258,10 +1294,10 @@ function renderDiaryList(){
     const likeCount = likeMap[item.id]?.length || 0;
 
     let avatarHtml = '';
-    if(avatar && avatar.startsWith('http')){
-      avatarHtml = `<img class="avatar ${isMe ? '' : 'other'}" src="${avatar}">`;
+    if(safeImageUrl(avatar)){
+      avatarHtml = `<img class="avatar ${isMe ? '' : 'other'}" src="${safeImageUrl(avatar)}">`;
     }else{
-      avatarHtml = `<div class="avatar ${isMe ? '' : 'other'}">${avatar || '😊'}</div>`;
+      avatarHtml = `<div class="avatar ${isMe ? '' : 'other'}">${escapeHtml(avatar || '😊')}</div>`;
     }
 
     return `
@@ -1269,12 +1305,12 @@ function renderDiaryList(){
       <div class="diary-header">
         <div class="diary-author">
           ${avatarHtml}
-          <span>${isMe ? '我' : name}</span>
+          <span>${isMe ? '我' : escapeHtml(name)}</span>
         </div>
         <div class="diary-time">${time}</div>
       </div>
-      ${item.mood ? `<div class="mood-tag">${item.mood}</div>` : ''}
-      <div class="diary-content">${item.content}</div>
+      ${item.mood ? `<div class="mood-tag">${escapeHtml(item.mood)}</div>` : ''}
+      <div class="diary-content">${escapeHtml(item.content)}</div>
       <div class="diary-actions">
         <div class="action-item ${liked ? 'liked' : ''}" onclick="toggleLike('${item.id}')">
           ❤️ <span>${likeCount}</span>
@@ -1354,7 +1390,7 @@ async function loadComments(diaryId){
   const userIds = [...new Set(list.map(c => c.user_id))];
   const {data: users} = await sb.from("profiles").select("id,nickname").in("id", userIds);
   const userMap = {};
-  users.forEach(u => userMap[u.id] = u);
+  (users || []).forEach(u => userMap[u.id] = u);
 
   container.innerHTML = list.map(c => {
     const name = userMap[c.user_id]?.nickname || '匿名';
@@ -1362,8 +1398,8 @@ async function loadComments(diaryId){
     
     return `
     <div class="comment-item">
-      <span class="comment-author">${name}：</span>
-      <span class="comment-content">${c.content}</span>
+      <span class="comment-author">${escapeHtml(name)}：</span>
+      <span class="comment-content">${escapeHtml(c.content)}</span>
       ${isMyComment ? `<span class="comment-del" onclick="deleteComment('${c.id}','${diaryId}')">删除</span>` : ''}
     </div>
     `
@@ -1486,44 +1522,16 @@ async function sendFlower(){
 
 // ========== 重置小红花（双重密码验证） ==========
 function openResetModal(){
-  if(!currentUser) return alert("请先登录");
-  if(!partnerProfile) return alert("请先绑定伴侣");
-  document.getElementById("reset-email1").value = myProfile.email;
-  document.getElementById("reset-email2").value = partnerProfile.email;
-  document.getElementById("reset-modal").classList.add("active");
+  alert("重置功能暂不可用，正在升级双方确认方式。");
 }
 function closeResetModal(){
   document.getElementById("reset-modal").classList.remove("active");
 }
 
 async function confirmReset(){
-  const email1 = document.getElementById("reset-email1").value.trim();
-  const pwd1 = document.getElementById("reset-pwd1").value;
-  const email2 = document.getElementById("reset-email2").value.trim();
-  const pwd2 = document.getElementById("reset-pwd2").value;
-
-  if(!email1 || !pwd1 || !email2 || !pwd2) return alert("请填写完整信息");
-
-  // 验证第一个账号
-  const { error: err1 } = await sb.auth.signInWithPassword({email: email1, password: pwd1});
-  if(err1) return alert("第一个账号密码错误");
-
-  // 验证第二个账号
-  const { error: err2 } = await sb.auth.signInWithPassword({email: email2, password: pwd2});
-  if(err2) return alert("第二个账号密码错误");
-
-  // 都验证通过，执行重置
-  await sb.from("flower_records").delete()
-    .or(`sender_id.eq.${currentUser.id},receiver_id.eq.${currentUser.id}`);
-
-  // 重新登录自己
-  await sb.auth.signInWithPassword({email: myProfile.email, password: pwd1});
-  
-  alert("✅ 小红花已重置");
+  // 不能通过切换当前登录账号验证另一位用户；待服务端安全流程就绪后恢复。
+  alert("重置功能暂不可用，正在升级双方确认方式。");
   closeResetModal();
-  loadFlowerStats();
-  loadFlowerRecords();
-  loadRewardList();
 }
 
 async function loadFlowerStats(){
@@ -1566,7 +1574,7 @@ async function loadFlowerRecords(){
         <div class="item-title">
           ${isRedeem ? '🎁 兑换奖励' : (isMeSend ? '送出' : '收到')} ${item.amount} 朵小红花
         </div>
-        <div class="item-desc">${item.reward_text || '无备注'} · ${new Date(item.created_at).toLocaleDateString()}</div>
+        <div class="item-desc">${escapeHtml(item.reward_text || '无备注')} · ${new Date(item.created_at).toLocaleDateString()}</div>
       </div>
     </div>
   `}).join('');
@@ -1606,7 +1614,7 @@ async function loadRewardList(){
   container.innerHTML = list.map(item=>`
     <div class="list-item">
       <div class="item-left">
-        <div class="item-title">🎁 ${item.content}</div>
+        <div class="item-title">🎁 ${escapeHtml(item.content)}</div>
         <div class="item-desc">需要 <span class="reward-cost">${item.flower_cost}</span> 朵小红花</div>
       </div>
       <div class="inline-btn">
@@ -1685,8 +1693,8 @@ async function loadWishList(){
   container.innerHTML = list.map(item=>`
     <div class="list-item ${item.done ? 'item-done' : ''}">
       <div class="item-left">
-        <div class="item-title">⭐ ${item.content}</div>
-        <div class="item-desc">${item.deadline ? '截止：'+item.deadline : '无截止日期'}</div>
+        <div class="item-title">⭐ ${escapeHtml(item.content)}</div>
+        <div class="item-desc">${item.deadline ? '截止：'+escapeHtml(item.deadline) : '无截止日期'}</div>
       </div>
       <div class="inline-btn">
         ${!item.done ? `<button class="mini-btn" onclick="toggleWish('${item.id}', true)">完成</button>` : ''}
@@ -1708,7 +1716,8 @@ async function deleteWish(id){
 }
 
 // 启动
-init();
+init().catch(error => { console.error(error); alert("无法连接登录服务，请检查网络后刷新页面。"); });
 </script>
 </body>
 </html>
+
