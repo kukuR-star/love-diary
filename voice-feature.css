@@ -1,0 +1,15 @@
+.voice-section { margin-top: 12px; padding-top: 12px; border-top: 1px solid #e4eae5; }
+.voice-heading { font-weight: 600; color: #5a6d61; font-size: 14px; margin-bottom: 8px; }
+.voice-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.voice-actions button { min-height:40px; padding:8px 12px; font-size:14px; border-radius:9px; }
+.voice-button,.voice-send { background:#637e6b; color:white; }
+.voice-dictate,.voice-discard { background:#e5ece7; color:#50685a; }
+.voice-transcript { min-height:60px; margin-top:10px; font-size:16px; }
+.voice-note,.voice-status { color:#7b877f; line-height:1.5; font-size:12px; margin-top:6px; }
+.voice-item { margin:8px 0; padding:10px; border-radius:10px; background:#e8eeea; }
+.voice-author { display:block; margin-bottom:6px; font-size:13px; color:#5d7264; }
+.voice-play { min-height:40px; background:#d5e5d9; color:#405a48; }
+.voice-item audio { max-width:100%; height:40px; }
+.voice-text { margin-top:7px; color:#49574e; font-size:14px; white-space:pre-wrap; overflow-wrap:anywhere; }
+
+.voice-remove { float:right; padding:6px 9px; min-height:36px; color:#7b807d; background:transparent; font-size:13px; }

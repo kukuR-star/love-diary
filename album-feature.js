@@ -6,6 +6,58 @@ let albumLoadVersion = 0;
 let albumObserver = null;
 let albumDialog = null;
 let albumReturnFocus = null;
+let albumCategory = '全部';
+let albumCategories = new Map();
+const ALBUM_DEFAULT_CATEGORIES = ['合照', '旅行', '生活'];
+
+function initAlbumControls() {
+  const grid = document.getElementById('album-grid');
+  const input = document.querySelector('#panel-album input[type=file]');
+  if (!grid || !input) return;
+  input.multiple = true;
+  if (document.getElementById('album-filters')) return;
+  const wrapper = document.createElement('div'); wrapper.className = 'album-controls'; wrapper.id = 'album-filters';
+  const label = document.createElement('label'); label.textContent = '查看分类';
+  const filter = document.createElement('select'); filter.id = 'album-category-filter'; filter.setAttribute('aria-label', '查看相册分类');
+  filter.addEventListener('change', () => { albumCategory = filter.value; loadAlbum(); });
+  label.appendChild(filter);
+  const uploadLabel = document.createElement('label'); uploadLabel.textContent = '添加到';
+  const uploadCategory = document.createElement('select'); uploadCategory.id = 'album-upload-category'; uploadCategory.setAttribute('aria-label', '上传到哪个分类');
+  uploadLabel.appendChild(uploadCategory);
+  wrapper.append(label,uploadLabel); grid.before(wrapper);
+}
+function updateAlbumCategoryOptions() {
+  const filter = document.getElementById('album-category-filter');
+  const upload = document.getElementById('album-upload-category');
+  if(!filter || !upload) return;
+  const previous = upload.value;
+  const categories = [...new Set([...ALBUM_DEFAULT_CATEGORIES, ...albumCategories.values()].filter(Boolean))].sort();
+  function fill(select, values, chosen) {
+    select.replaceChildren();
+    for (const [value, text] of values) { const opt = document.createElement('option'); opt.value = value; opt.textContent = text; select.appendChild(opt); }
+    if ([...select.options].some(o => o.value === chosen)) select.value = chosen;
+  }
+  fill(filter, [['全部','全部'], ['未分类','未分类'], ...categories.map(c => [c,c])], albumCategory);
+  fill(upload, [['','未分类'], ...categories.map(c => [c,c]), ['__new__','＋ 新建分类']], previous);
+  upload.onchange = () => {
+    if (upload.value !== '__new__') return;
+    const name = prompt('输入新分类名称（最多 30 个字）');
+    const clean = (name || '').trim();
+    if (!clean || clean.length > 30 || ['全部','未分类','__new__'].includes(clean)) { upload.value = ''; if(clean) alert('分类名称无效，请重新输入。'); return; }
+    const option = document.createElement('option'); option.value = clean; option.textContent = clean; upload.insertBefore(option, upload.lastElementChild); upload.value = clean;
+  };
+}
+async function setAlbumCategory(file) {
+  const existing = albumCategories.get(file.path) || '';
+  const value = prompt('输入分类名称，留空则移至未分类：', existing);
+  if (value === null) return;
+  const category = value.trim();
+  if (category.length > 30 || ['全部','未分类','__new__'].includes(category)) return alert('分类名称无效，请重新输入。');
+  const query = category ? sb.from('album_media_categories').upsert({object_path:file.path,owner_id:currentUser.id,category}) : sb.from('album_media_categories').delete().eq('object_path',file.path).eq('owner_id',currentUser.id);
+  const {error} = await query;
+  if(error) return alert('分类保存失败，请稍后重试。');
+  await loadAlbum();
+}
 
 function albumThumbnailPath(path) {
   const slash = path.indexOf('/');
@@ -67,16 +119,21 @@ async function loadAlbumThumbnail(button, file, version) {
 async function loadAlbum(){
   const container = document.getElementById('album-grid'); const status = document.getElementById('album-status');
   if (!container || !currentUser) return;
+  initAlbumControls();
   const userId = currentUser.id; const version = ++albumLoadVersion;
   albumObserver?.disconnect(); container.replaceChildren(); status.textContent = '正在打开相册…';
   try {
     const owners = [...new Set([userId, partnerProfile?.id].filter(Boolean))];
-    const pages = await Promise.all(owners.map(id => sb.storage.from(ALBUM_BUCKET).list(id, {limit: 100, sortBy:{column:'created_at',order:'desc'}})));
+    const [pages, categoryResult] = await Promise.all([Promise.all(owners.map(id => sb.storage.from(ALBUM_BUCKET).list(id, {limit: 100, sortBy:{column:'created_at',order:'desc'}}))), sb.from('album_media_categories').select('object_path,category')]);
+    if (categoryResult.error) throw categoryResult.error;
+    albumCategories = new Map((categoryResult.data || []).map(row => [row.object_path,row.category]));
+    updateAlbumCategoryOptions();
     if (version !== albumLoadVersion || currentUser?.id !== userId) return;
     const failed = pages.find(p => p.error); if (failed) throw failed.error;
-    const files = pages.flatMap((page, i) => (page.data || []).filter(f => f.id && f.name !== '.emptyFolderPlaceholder').map(f => ({...f, path:`${owners[i]}/${f.name}`, own:owners[i] === userId})));
+    let files = pages.flatMap((page, i) => (page.data || []).filter(f => f.id && f.name !== '.emptyFolderPlaceholder').map(f => ({...f, path:`${owners[i]}/${f.name}`, own:owners[i] === userId})));
     files.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
-    if (!files.length) { status.textContent = '这里还没有照片或视频，留住第一个瞬间吧。'; return; }
+    if (albumCategory !== '全部') files = files.filter(f => (albumCategories.get(f.path) || '未分类') === albumCategory);
+    if (!files.length) { status.textContent = albumCategory === '全部' ? '这里还没有照片或视频，留住第一个瞬间吧。' : '这个分类里还没有照片或视频。'; return; }
     status.textContent = '';
     const pending = new Map();
     if ('IntersectionObserver' in window) albumObserver = new IntersectionObserver(entries => entries.forEach(entry => {
@@ -92,7 +149,7 @@ async function loadAlbum(){
       button.addEventListener('click', () => openAlbumViewer(f, button)); card.appendChild(button);
       const footer = document.createElement('div'); footer.className = 'album-item-footer';
       const date = document.createElement('span'); date.textContent = f.created_at ? new Date(f.created_at).toLocaleDateString('zh-CN') : ''; footer.appendChild(date);
-      if(f.own){ const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'album-delete'; remove.textContent = '删除'; remove.setAttribute('aria-label', '删除这份照片或视频'); remove.addEventListener('click',()=>deleteAlbumFile(f.path)); footer.appendChild(remove); }
+      if(f.own){ const categorize = document.createElement('button'); categorize.type='button'; categorize.className='album-categorize'; categorize.textContent='分类'; categorize.setAttribute('aria-label','修改分类'); categorize.addEventListener('click',()=>setAlbumCategory(f)); footer.appendChild(categorize); const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'album-delete'; remove.textContent = '删除'; remove.setAttribute('aria-label', '删除这份照片或视频'); remove.addEventListener('click',()=>deleteAlbumFile(f.path)); footer.appendChild(remove); }
       card.appendChild(footer); container.appendChild(card);
       if (!video) { if (albumObserver) { pending.set(button, f); albumObserver.observe(button); } else loadAlbumThumbnail(button, f, version); }
     }
@@ -111,27 +168,45 @@ async function makeAlbumThumbnail(file) {
   } finally { URL.revokeObjectURL(url); }
 }
 async function uploadAlbumFile(input){
-  const file = input.files?.[0]; if(!file || albumBusy || !currentUser) return;
+  const files = Array.from(input.files || []); if(!files.length || albumBusy || !currentUser) return;
   const extensions = {'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/heic':'heic','video/mp4':'mp4','video/quicktime':'mov','video/webm':'webm'};
-  const ext = extensions[file.type];
-  if(!ext){ alert('请选择 JPG、PNG、WebP、HEIC、MP4、MOV 或 WebM 文件。'); input.value=''; return; }
-  if(file.size > ALBUM_LIMIT){ alert('单个文件不能超过 50 MB。'); input.value=''; return; }
-  albumBusy = true; const status = document.getElementById('album-status'); status.textContent = '正在上传，请保持页面打开…';
+  const selected = document.getElementById('album-upload-category')?.value || '';
+  const category = selected === '__new__' ? '' : selected;
+  const status = document.getElementById('album-status');
+  albumBusy = true; input.disabled = true;
+  let uploaded = 0, failed = 0, uncategorized = 0;
   try {
-    const path = `${currentUser.id}/${crypto.randomUUID()}.${ext}`;
-    const {error} = await sb.storage.from(ALBUM_BUCKET).upload(path, file, {contentType:file.type, upsert:false}); if(error) throw error;
-    if(file.type.startsWith('image/')) {
-      try { const thumb = await makeAlbumThumbnail(file); if(thumb) { const result = await sb.storage.from(ALBUM_BUCKET).upload(albumThumbnailPath(path), thumb, {contentType:'image/jpeg',upsert:false}); if(result.error) console.warn('缩略图生成失败', result.error); } }
-      catch(error) { console.warn('无法生成缩略图',error); }
+    for (let i=0; i<files.length; i++) {
+      const file=files[i]; const ext=extensions[file.type];
+      status.textContent = `正在处理 ${i+1} / ${files.length}…`;
+      if(!ext || file.size>ALBUM_LIMIT) { failed++; continue; }
+      try {
+        const path = `${currentUser.id}/${crypto.randomUUID()}.${ext}`;
+        const {error} = await sb.storage.from(ALBUM_BUCKET).upload(path,file,{contentType:file.type,upsert:false});
+        if(error) throw error;
+        uploaded++;
+        if(category){
+          const result = await sb.from('album_media_categories').insert({object_path:path,owner_id:currentUser.id,category});
+          if(result.error){ console.warn('分类保存失败',result.error); uncategorized++; }
+        }
+        if(file.type.startsWith('image/')) {
+          try { const thumb=await makeAlbumThumbnail(file); if(thumb) { const result=await sb.storage.from(ALBUM_BUCKET).upload(albumThumbnailPath(path),thumb,{contentType:'image/jpeg',upsert:false}); if(result.error) console.warn('缩略图上传失败',result.error); } }
+          catch(error){ console.warn('缩略图生成失败',error); }
+        }
+      } catch(error) { console.error('上传失败',error); failed++; }
     }
+    albumCategory = category || '全部';
     await loadAlbum();
-  } catch(error){ console.error('上传失败',error); status.textContent = '上传失败，请检查网络或稍后再试。'; }
-  finally { albumBusy = false; input.value = ''; }
+    status.textContent = `已上传 ${uploaded} 项${failed ? `，${failed} 项失败（请检查格式、网络和 50 MB 限制）` : ''}${uncategorized ? `，${uncategorized} 项未能保存分类` : ''}。`;
+  } finally { albumBusy = false; input.disabled = false; input.value = ''; }
 }
+
 async function deleteAlbumFile(path){
   if(!confirm('确定删除这份照片或视频吗？')) return;
   const paths = albumIsVideo(path) ? [path] : [path, albumThumbnailPath(path)];
   const {error} = await sb.storage.from(ALBUM_BUCKET).remove(paths);
   if(error) return alert('删除失败，请稍后重试。');
+  const cleanup = await sb.from('album_media_categories').delete().eq('object_path',path).eq('owner_id',currentUser.id);
+  if (cleanup.error) console.warn('分类记录清理失败', cleanup.error);
   await loadAlbum();
 }

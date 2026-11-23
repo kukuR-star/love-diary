@@ -688,6 +688,8 @@
   <link rel="stylesheet" href="timer-feature.css">
   <link rel="stylesheet" href="album-feature.css">
   <link rel="stylesheet" href="mood.css">
+  <link rel="stylesheet" href="app-navigation.css">
+  <link rel="stylesheet" href="voice-feature.css">
 </head>
 <body>
 <div class="container">
@@ -708,8 +710,8 @@
   <!-- 登录面板 -->
   <div id="auth-panel" class="auth-card">
     <h3>登录 / 注册</h3>
-    <input type="email" id="login-email" placeholder="请输入邮箱">
-    <input type="password" id="login-pwd" placeholder="请输入密码">
+    <input type="email" id="login-email" autocomplete="email" placeholder="请输入邮箱">
+    <input type="password" id="login-pwd" autocomplete="current-password" placeholder="请输入密码">
     <div class="auth-btn-group">
       <button onclick="signIn()">登录</button>
       <button class="secondary" onclick="signUp()">注册</button>
@@ -852,7 +854,7 @@
       <div class="card">
         <div class="album-intro">
           <div><h4>我们的私密相册</h4><p>为只属于你们的片刻，留一个位置。</p></div>
-          <label class="album-upload">添加照片或视频<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,video/mp4,video/quicktime,video/webm" onchange="uploadAlbumFile(this)"></label>
+          <label class="album-upload">添加照片或视频<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,video/mp4,video/quicktime,video/webm" multiple onchange="uploadAlbumFile(this)"></label>
         </div>
         <p class="album-status" id="album-status" role="status" aria-live="polite">打开相册后加载</p>
         <div class="album-grid" id="album-grid"></div>
@@ -916,6 +918,8 @@
 <script src="timer-feature.js"></script>
 <script src="album-feature.js"></script>
 <script src="flower-feature.js"></script>
+<script src="app-navigation.js"></script>
+<script src="voice-feature.js"></script>
 <script>
 // ===================== Supabase 配置 =====================
 const SUPABASE_URL = "https://bxiiapjcghlvyfgpfjhi.supabase.co";
@@ -934,6 +938,7 @@ let selectedDate = null;
 let allDiaryList = [];
 let authorMap = {};
 let likeMap = {};
+let commentCountMap = {};
 
 // 所有用户提供的文本在插入 HTML 前转义。
 function escapeHtml(value){
@@ -997,6 +1002,7 @@ async function signUp(){
   alert("注册成功！请登录");
 }
 async function signOut(){
+  stopVoiceRecording();
   await sb.auth.signOut();
   await refreshUser();
 }
@@ -1245,8 +1251,28 @@ async function loadAllDiaries(){
     likeMap[l.diary_id].push(l.user_id);
   });
 
+  await refreshCommentCounts();
   renderDiaryList();
   renderCalendar();
+}
+
+async function refreshCommentCounts(){
+  const ids = allDiaryList.map(d => d.id);
+  const userId = currentUser?.id;
+  if (!ids.length || !userId) { commentCountMap = {}; return; }
+  const [textResult, voiceResult] = await Promise.all([
+    sb.from("diaries_comments").select("diary_id").in("diary_id", ids),
+    sb.from("voice_comments").select("diary_id").in("diary_id", ids)
+  ]);
+  if (currentUser?.id !== userId) return;
+  if (textResult.error) { console.error('评论数量加载失败', textResult.error); return; }
+  const next = {};
+  for (const row of [...(textResult.data || []), ...(voiceResult.data || [])]) next[row.diary_id] = (next[row.diary_id] || 0) + 1;
+  commentCountMap = next;
+  document.querySelectorAll('[data-comment-count]').forEach(node => {
+    const count = commentCountMap[node.dataset.commentCount] || 0;
+    node.textContent = count ? `评论 · ${count}` : '评论';
+  });
 }
 
 // 筛选切换
@@ -1276,6 +1302,7 @@ function switchView(dom){
 
 // 渲染日记列表
 function renderDiaryList(){
+  stopVoiceRecording();
   let list = allDiaryList;
   
   // 筛选
@@ -1328,7 +1355,7 @@ function renderDiaryList(){
       <div class="diary-content">${escapeHtml(item.content)}</div>
       <div class="diary-actions">
         <button type="button" class="interaction-btn ${liked ? 'liked' : ''}" aria-pressed="${!!liked}" onclick="toggleLike('${item.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.3C5 7 9.1 5.9 12 9c2.9-3.1 7-2 7 1.7C19 15.6 12 20 12 20Z"/></svg><span>${liked ? '已赞' : '赞'}${likeCount ? ' · '+likeCount : ''}</span></button>
-        <button type="button" class="interaction-btn" onclick="toggleComment('${item.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5h16v11H10l-4 3v-3H4z"/></svg><span>评论</span></button>
+        <button type="button" class="interaction-btn" onclick="toggleComment('${item.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5h16v11H10l-4 3v-3H4z"/></svg><span data-comment-count="${item.id}">${commentCountMap[item.id] ? '评论 · ' + commentCountMap[item.id] : '评论'}</span></button>
         ${isMe ? `<button type="button" class="interaction-btn diary-delete" onclick="deleteDiary('${item.id}')">删除</button>` : ''}
       </div>
       <div class="comment-section" id="comment-${item.id}">
@@ -1339,6 +1366,7 @@ function renderDiaryList(){
           <input type="text" placeholder="写下你的评论..." id="comment-input-${item.id}">
           <button onclick="sendComment('${item.id}')">发送</button>
         </div>
+        <div id="voice-comments-${item.id}"></div>
       </div>
     </div>
     `
@@ -1360,7 +1388,11 @@ async function toggleLike(diaryId){
 // 删除日记
 async function deleteDiary(diaryId){
   if(!confirm("确定删除这条日记吗？")) return;
-  await sb.from("diaries").delete().eq("id", diaryId);
+  const {data: voices, error: voiceError} = await sb.from("voice_comments").select("id").eq("diary_id", diaryId).limit(1);
+  if(voiceError) return alert("无法检查语音留言，请稍后重试。");
+  if(voices?.length) return alert("请先删除这条日记中的语音留言，再删除日记。");
+  const {error} = await sb.from("diaries").delete().eq("id", diaryId);
+  if(error) return alert("删除失败，请稍后重试。");
   alert("删除成功");
   await loadAllDiaries();
 }
@@ -1371,7 +1403,9 @@ function toggleComment(diaryId){
   section.classList.toggle("open");
   if(section.classList.contains("open")){
     loadComments(diaryId);
-    document.getElementById(`comment-input-${diaryId}`).focus();
+    renderVoiceComments(diaryId, document.getElementById(`voice-comments-${diaryId}`));
+  } else {
+    stopVoiceRecording();
   }
 }
 
@@ -1422,14 +1456,15 @@ async function sendComment(diaryId){
 
   if(error) return alert("评论失败："+error.message);
   input.value = '';
-  loadComments(diaryId);
+  await Promise.all([loadComments(diaryId), refreshCommentCounts()]);
 }
 
 // 删除评论
 async function deleteComment(commentId, diaryId){
   if(!confirm("确定删除这条评论吗？")) return;
-  await sb.from("diaries_comments").delete().eq("id", commentId);
-  loadComments(diaryId);
+  const {error} = await sb.from("diaries_comments").delete().eq("id", commentId);
+  if (error) return alert("删除失败，请稍后重试。");
+  await Promise.all([loadComments(diaryId), refreshCommentCounts()]);
 }
 
 
