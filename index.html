@@ -722,11 +722,13 @@
 
     <!-- 主Tab -->
     <div class="main-tabs">
+      <button class="main-tab" data-tab="anniversaries">💝 纪念日</button>
       <button class="main-tab active" data-tab="diary">📝 生活日记</button>
       <button class="main-tab" data-tab="flower">🌸 小红花奖励</button>
       <button class="main-tab" data-tab="wish">🎁 许愿礼物</button>
     </div>
 
+    <div class="panel" id="panel-anniversaries"><div class="card"><h4>💝 添加纪念日</h4><p style="color:#888;font-size:14px;margin-bottom:10px;">记录在一起的日子、生日、旅行日等。绑定伴侣后双方可共享。</p><input id="anniversary-title" type="text" maxlength="60" placeholder="纪念日名称"><input id="anniversary-date" type="date"><button onclick="addAnniversary()" style="width:100%;margin-top:8px;">添加纪念日</button></div><div class="card"><h4>⏳ 我们的纪念日</h4><div id="anniversary-list"><div class="empty">加载中...</div></div></div></div>
     <!-- ========== 日记面板 ========== -->
     <div class="panel active" id="panel-diary">
       <div class="card">
@@ -929,6 +931,7 @@ async function init() {
     await updateFilterLabels(); // 更新筛选标签昵称
     await loadSiteTitle();
     await loadAllDiaries();
+    await loadAnniversaries();
     loadFlowerStats();
     loadFlowerRecords();
     loadRewardList();
@@ -1146,6 +1149,33 @@ document.querySelectorAll(".main-tab").forEach(tab=>{
   }
 })
 
+// ===================== 纪念日模块 =====================
+function anniversaryEscape(s){const n=document.createElement("span");n.textContent=s||"";return n.innerHTML;}
+async function loadAnniversaries(){
+ if(!currentUser)return;
+ const {data,error}=await sb.from("anniversaries").select("*").order("date");
+ const box=document.getElementById("anniversary-list");
+ if(error){box.innerHTML="<div class=\"empty\">加载失败：请先在 Supabase 执行 supabase/anniversaries.sql</div>";return;}
+ if(!data||!data.length){box.innerHTML="<div class=\"empty\">还没有纪念日，添加第一个特别日子吧 💗</div>";return;}
+ const today=new Date();today.setHours(0,0,0,0);
+ box.innerHTML=data.map(item=>{
+  const [y,m,d]=item.date.split("-").map(Number);
+  const start=new Date(y,m-1,d);
+  const elapsed=Math.floor((today-start)/86400000)+1;
+  let next=new Date(today.getFullYear(),m-1,d);if(next<today)next=new Date(today.getFullYear()+1,m-1,d);
+  const days=Math.round((next-today)/86400000);
+  const span=elapsed>0?"<div class=\"item-desc\">已经 "+elapsed+" 天</div>":"";
+  return "<div class=\"list-item\"><div class=\"item-left\"><div class=\"item-title\">💝 "+anniversaryEscape(item.title)+"</div><div class=\"item-desc\">"+item.date+" · "+(days===0?"就是今天！":"还有 "+days+" 天")+"</div>"+span+"</div><button class=\"mini-btn secondary\" onclick=\"deleteAnniversary(\'"+item.id+"\')\">删除</button></div>";
+ }).join("");
+}
+async function addAnniversary(){
+ const title=document.getElementById("anniversary-title").value.trim(),date=document.getElementById("anniversary-date").value;
+ if(!currentUser)return alert("请先登录");if(!title||!date)return alert("请填写名称和日期");
+ const {error}=await sb.from("anniversaries").insert({owner_id:currentUser.id,title,date});
+ if(error)return alert("添加失败："+error.message);
+ document.getElementById("anniversary-title").value="";document.getElementById("anniversary-date").value="";await loadAnniversaries();
+}
+async function deleteAnniversary(id){if(!confirm("确定删除这条纪念日吗？"))return;const {error}=await sb.from("anniversaries").delete().eq("id",id);if(error)return alert("删除失败："+error.message);await loadAnniversaries();}
 // ===================== 日记模块 =====================
 function pickMood(dom){
   document.querySelectorAll(".mood-item").forEach(i=>i.classList.remove("active"));
