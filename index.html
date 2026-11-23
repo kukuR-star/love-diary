@@ -696,14 +696,11 @@
   <div class="header">
     <h1 id="site-title" onclick="editTitle()">💖 我们的恋爱小屋</h1>
     <div class="user-bar">
-      <div class="user-info-click" onclick="openProfileModal()">
+      <button type="button" class="user-info-click" onclick="openProfileModal()" aria-label="个人设置">
         <img id="user-avatar-img" class="avatar-img" src="" style="display:none;">
         <span id="user-avatar-emoji">😊</span>
         <span id="user-info">加载中...</span>
-      </div>
-      <button class="bind-btn" id="bind-btn" style="display:none" onclick="openBindModal()">绑定伴侣</button>
-      <button class="reset-btn" id="reset-btn" style="display:none" onclick="openResetModal()">重置花</button>
-      <button class="reset-btn" id="logout-btn" style="display:none" onclick="signOut()">退出登录</button>
+      </button>
     </div>
   </div>
 
@@ -779,6 +776,7 @@
 
     <!-- ========== 小红花面板 ========== -->
     <div class="panel" id="panel-flower">
+      <div class="flower-settings"><button class="reset-btn" id="reset-btn" style="display:none" onclick="openResetModal()">重置小红花</button></div>
       <div class="card">
         <h4>🌸 小红花统计</h4>
         <div class="flower-stats">
@@ -901,6 +899,8 @@
     </div>
     <input type="text" id="edit-nickname" placeholder="你的昵称">
     <button onclick="saveProfile()" style="width:100%;margin-top:8px;">保存</button>
+    <button class="secondary" id="bind-btn" style="display:none;width:100%;margin-top:8px;" onclick="closeProfileModal();openBindModal()">伴侣设置</button>
+    <button class="secondary" id="logout-btn" style="display:none;width:100%;margin-top:8px;" onclick="closeProfileModal();signOut()">退出登录</button>
     <button class="secondary" style="width:100%;margin-top:8px;" onclick="closeProfileModal()">取消</button>
   </div>
 </div>
@@ -976,7 +976,8 @@ async function refreshUser(){
   const authPanel = document.getElementById("auth-panel");
   const mainContent = document.getElementById("main-content");
 
-  for (const id of ["logout-btn", "bind-btn", "reset-btn"]) document.getElementById(id).style.display = user ? "inline-block" : "none";
+  for (const id of ["logout-btn", "bind-btn"]) document.getElementById(id).style.display = user ? "block" : "none";
+  document.getElementById("reset-btn").style.display = user ? "inline-block" : "none";
   if(user){
     authPanel.style.display = "none";
     mainContent.style.display = "block";
@@ -1031,7 +1032,7 @@ function updateAvatarDisplay(){
     emojiDom.style.display = "none";
   }else{
     imgDom.style.display = "none";
-    emojiDom.style.display = "inline";
+    emojiDom.style.display = "inline-flex";
     emojiDom.innerText = myProfile.avatar || '😊';
   }
 }

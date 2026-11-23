@@ -13,3 +13,9 @@
 .voice-text { margin-top:7px; color:#49574e; font-size:14px; white-space:pre-wrap; overflow-wrap:anywhere; }
 
 .voice-remove { float:right; padding:6px 9px; min-height:36px; color:#7b807d; background:transparent; font-size:13px; }
+.voice-section [hidden], .diary-voice-composer [hidden], .comment-input-box [hidden], #diary-content[hidden], button[onclick="saveDiary()"][hidden] { display:none !important; }
+.voice-mode-toggle { flex:none; min-width:40px; min-height:40px; padding:5px; color:#587266; font-size:22px; background:#e8efea; border-radius:50%; }
+.diary-voice-composer { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:8px; }
+.diary-voice-composer audio { max-width:100%; height:40px; }
+.diary-voice-play { display:block; margin:8px 0; background:#e3eee6; color:#41654f; }
+.voice-section .voice-note { font-size:12px; }

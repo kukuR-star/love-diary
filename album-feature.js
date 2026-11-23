@@ -9,12 +9,32 @@ let albumReturnFocus = null;
 let albumCategory = '全部';
 let albumCategories = new Map();
 const ALBUM_DEFAULT_CATEGORIES = ['合照', '旅行', '生活'];
+// URL cache is memory-only and shorter lived than the signed URL itself.
+const albumUrlCache = new Map();
+const albumThumbnailWrites = new Set();
 
 function initAlbumControls() {
   const grid = document.getElementById('album-grid');
   const input = document.querySelector('#panel-album input[type=file]');
   if (!grid || !input) return;
   input.multiple = true;
+  // Separate inputs keep iOS Photos picker in image-multiple mode instead of
+  // mixing image and video UTIs. The system camera itself remains single-shot.
+  if (!document.getElementById('album-video-input')) {
+    const imageLabel = input.closest('label');
+    if (imageLabel) {
+      imageLabel.replaceChildren(document.createTextNode('选择照片'), input);
+      input.accept = 'image/*';
+      const videoLabel = document.createElement('label');
+      videoLabel.className = 'album-upload album-video-upload';
+      videoLabel.appendChild(document.createTextNode('选择视频'));
+      const videoInput = document.createElement('input');
+      videoInput.id = 'album-video-input'; videoInput.type = 'file';
+      videoInput.accept = 'video/*'; videoInput.multiple = true;
+      videoInput.addEventListener('change', () => uploadAlbumFile(videoInput));
+      videoLabel.appendChild(videoInput); imageLabel.after(videoLabel);
+    }
+  }
   if (document.getElementById('album-filters')) return;
   const wrapper = document.createElement('div'); wrapper.className = 'album-controls'; wrapper.id = 'album-filters';
   const label = document.createElement('label'); label.textContent = '查看分类';
@@ -64,8 +84,12 @@ function albumThumbnailPath(path) {
   return `${path.slice(0, slash)}/.thumbs/${path.slice(slash + 1)}.jpg`;
 }
 async function albumSignedUrl(path) {
+  const key = `${currentUser?.id || ''}:${path}`;
+  const cached = albumUrlCache.get(key);
+  if (cached && cached.expires > Date.now()) return cached.url;
   const {data, error} = await sb.storage.from(ALBUM_BUCKET).createSignedUrl(path, 3600);
   if (error || !data?.signedUrl) throw error || new Error('无法获取文件');
+  albumUrlCache.set(key, {url:data.signedUrl, expires:Date.now() + 55 * 60 * 1000});
   return data.signedUrl;
 }
 function albumIsVideo(name) { return /\.(mp4|webm|mov)$/i.test(name); }
@@ -104,10 +128,20 @@ async function openAlbumViewer(file, trigger) {
 }
 async function loadAlbumThumbnail(button, file, version) {
   if (albumIsVideo(file.name)) return; // Do not download every video while browsing the grid.
-  const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; img.decoding = 'async';
+  const img = document.createElement('img'); img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; img.crossOrigin = 'anonymous';
   const showOriginal = async () => {
-    try { const url = await albumSignedUrl(file.path); if (version === albumLoadVersion && button.isConnected) img.src = url; }
-    catch { if (button.isConnected) button.classList.add('album-thumb-error'); }
+    try {
+      const url = await albumSignedUrl(file.path);
+      if (version !== albumLoadVersion || !button.isConnected) return;
+      // Build a private thumbnail once for existing own photos. A failed CORS,
+      // conversion or upload never blocks showing the original.
+      img.onload = () => {
+        if (!file.own || albumThumbnailWrites.has(file.path)) return;
+        albumThumbnailWrites.add(file.path);
+        saveLegacyThumbnail(img, file.path).catch(() => albumThumbnailWrites.delete(file.path));
+      };
+      img.src = url;
+    } catch { if (button.isConnected) button.classList.add('album-thumb-error'); }
   };
   try {
     const url = await albumSignedUrl(albumThumbnailPath(file.path));
@@ -115,6 +149,17 @@ async function loadAlbumThumbnail(button, file, version) {
     img.onerror = () => { img.onerror = () => button.classList.add('album-thumb-error'); showOriginal(); };
     img.src = url; button.prepend(img);
   } catch { button.prepend(img); await showOriginal(); }
+}
+async function listAlbumOwner(owner) {
+  const files = [];
+  const size = 100;
+  for (let offset = 0; ; offset += size) {
+    const {data, error} = await sb.storage.from(ALBUM_BUCKET).list(owner, {limit:size, offset, sortBy:{column:'created_at',order:'desc'}});
+    if (error) return {data:null, error};
+    files.push(...(data || []));
+    if (!data || data.length < size) break;
+  }
+  return {data:files, error:null};
 }
 async function loadAlbum(){
   const container = document.getElementById('album-grid'); const status = document.getElementById('album-status');
@@ -124,7 +169,7 @@ async function loadAlbum(){
   albumObserver?.disconnect(); container.replaceChildren(); status.textContent = '正在打开相册…';
   try {
     const owners = [...new Set([userId, partnerProfile?.id].filter(Boolean))];
-    const [pages, categoryResult] = await Promise.all([Promise.all(owners.map(id => sb.storage.from(ALBUM_BUCKET).list(id, {limit: 100, sortBy:{column:'created_at',order:'desc'}}))), sb.from('album_media_categories').select('object_path,category')]);
+    const [pages, categoryResult] = await Promise.all([Promise.all(owners.map(listAlbumOwner)), sb.from('album_media_categories').select('object_path,category')]);
     if (categoryResult.error) throw categoryResult.error;
     albumCategories = new Map((categoryResult.data || []).map(row => [row.object_path,row.category]));
     updateAlbumCategoryOptions();
@@ -155,13 +200,25 @@ async function loadAlbum(){
     }
   } catch(error) { console.error('加载相册失败',error); if(version === albumLoadVersion) status.textContent = '相册暂时无法连接，请稍后重试。'; }
 }
+async function saveLegacyThumbnail(img, path) {
+  const scale = Math.min(1, 360 / Math.max(img.naturalWidth, img.naturalHeight));
+  if (!Number.isFinite(scale) || scale <= 0) return;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.72));
+  if (!blob) return;
+  const {error} = await sb.storage.from(ALBUM_BUCKET).upload(albumThumbnailPath(path), blob, {contentType:'image/jpeg', upsert:false});
+  if (error) throw error;
+}
 async function makeAlbumThumbnail(file) {
-  if (!file.type.startsWith('image/')) return null;
+  // Caller already validated a supported image MIME, including iOS files with an empty type.
   const url = URL.createObjectURL(file);
   try {
     const img = new Image(); img.src = url;
     await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; });
-    const scale = Math.min(1, 480 / Math.max(img.naturalWidth, img.naturalHeight));
+    const scale = Math.min(1, 360 / Math.max(img.naturalWidth, img.naturalHeight));
     const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(img.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
     canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
     return await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.72));
@@ -177,19 +234,23 @@ async function uploadAlbumFile(input){
   let uploaded = 0, failed = 0, uncategorized = 0;
   try {
     for (let i=0; i<files.length; i++) {
-      const file=files[i]; const ext=extensions[file.type];
+      const file=files[i];
+      const fallbackTypes = {jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',heic:'image/heic',mp4:'video/mp4',mov:'video/quicktime',webm:'video/webm'};
+      const extension = file.name.split('.').pop().toLowerCase();
+      const mime = file.type || fallbackTypes[extension] || '';
+      const ext=extensions[mime];
       status.textContent = `正在处理 ${i+1} / ${files.length}…`;
       if(!ext || file.size>ALBUM_LIMIT) { failed++; continue; }
       try {
         const path = `${currentUser.id}/${crypto.randomUUID()}.${ext}`;
-        const {error} = await sb.storage.from(ALBUM_BUCKET).upload(path,file,{contentType:file.type,upsert:false});
+        const {error} = await sb.storage.from(ALBUM_BUCKET).upload(path,file,{contentType:mime,upsert:false});
         if(error) throw error;
         uploaded++;
         if(category){
           const result = await sb.from('album_media_categories').insert({object_path:path,owner_id:currentUser.id,category});
           if(result.error){ console.warn('分类保存失败',result.error); uncategorized++; }
         }
-        if(file.type.startsWith('image/')) {
+        if(mime.startsWith('image/')) {
           try { const thumb=await makeAlbumThumbnail(file); if(thumb) { const result=await sb.storage.from(ALBUM_BUCKET).upload(albumThumbnailPath(path),thumb,{contentType:'image/jpeg',upsert:false}); if(result.error) console.warn('缩略图上传失败',result.error); } }
           catch(error){ console.warn('缩略图生成失败',error); }
         }
@@ -204,6 +265,8 @@ async function uploadAlbumFile(input){
 async function deleteAlbumFile(path){
   if(!confirm('确定删除这份照片或视频吗？')) return;
   const paths = albumIsVideo(path) ? [path] : [path, albumThumbnailPath(path)];
+  albumThumbnailWrites.delete(path);
+  for (const item of paths) albumUrlCache.delete(`${currentUser?.id || ''}:${item}`);
   const {error} = await sb.storage.from(ALBUM_BUCKET).remove(paths);
   if(error) return alert('删除失败，请稍后重试。');
   const cleanup = await sb.from('album_media_categories').delete().eq('object_path',path).eq('owner_id',currentUser.id);

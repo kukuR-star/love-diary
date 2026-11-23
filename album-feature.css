@@ -25,3 +25,7 @@ body.album-viewer-open { overflow:hidden; }
 .album-controls select { margin:.35rem 0 0; background:#fff; border-color:#dfe6df; font-size:.9rem; }
 button.album-categorize { padding:.35rem; background:transparent; color:#68736c; border:0; box-shadow:none; font-size:.78rem; }
 .album-item-footer { flex-wrap:wrap; }
+
+.album-intro > .album-upload { flex: 1 1 120px; }
+.album-upload + .album-video-upload { background:#e7ebe7; color:#3d5145; }
+@media(max-width:600px){.album-intro > div:first-child{width:100%}.album-intro > .album-upload{width:auto; flex:1 1 0}}

@@ -32,3 +32,15 @@ body { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
   #milestones-root .milestones-header { margin-bottom:14px; }
   #milestones-root .milestone-count strong { font-size:38px; }
 }
+.user-info-click { background:transparent; padding:0; border:0; color:inherit; font-size:14px; box-shadow:none; }
+.user-info-click:hover { background:transparent; transform:none; box-shadow:none; }
+.user-info-click .avatar-img, #user-avatar-emoji { width:42px; height:42px; border-radius:50%; object-fit:cover; }
+#user-avatar-emoji { display:inline-flex; align-items:center; justify-content:center; background:#e8efea; font-size:23px; }
+.flower-settings { display:flex; justify-content:flex-end; margin:0 0 10px; }
+@media (max-width:600px) {
+  .header { flex-wrap:nowrap; justify-content:space-between; }
+  .header h1 { min-width:0; flex:1; font-size:19px; }
+  .user-bar { width:auto; flex-shrink:0; }
+  .user-info-click { gap:7px; }
+  #user-info { max-width:5em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+}
