@@ -690,6 +690,9 @@
   <link rel="stylesheet" href="mood.css">
   <link rel="stylesheet" href="app-navigation.css">
   <link rel="stylesheet" href="voice-feature.css">
+  <link rel="stylesheet" href="todos-feature.css">
+  <link rel="stylesheet" href="chat-composer.css">
+  <link rel="stylesheet" href="attachment-feature.css">
 </head>
 <body>
 <div class="container">
@@ -729,6 +732,7 @@
     <div class="main-tabs">
       <button class="main-tab active" data-tab="diary">📝 生活日记</button>
       <button class="main-tab" data-tab="flower">🌸 小红花奖励</button>
+      <button class="main-tab" data-tab="todos">待办</button>
       <button class="main-tab" data-tab="wish">🎁 许愿礼物</button>
       <button class="main-tab" data-tab="album">相册</button>
     </div>
@@ -848,6 +852,7 @@
       </div>
     </div>
 
+    <div class="panel" id="panel-todos"><div id="todos-root"></div></div>
     <div class="panel" id="panel-album">
       <div class="card">
         <div class="album-intro">
@@ -920,6 +925,9 @@
 <script src="flower-feature.js"></script>
 <script src="app-navigation.js"></script>
 <script src="voice-feature.js"></script>
+<script src="todos-feature.js"></script>
+<script src="chat-composer.js"></script>
+<script src="attachment-feature.js"></script>
 <script>
 // ===================== Supabase 配置 =====================
 const SUPABASE_URL = "https://bxiiapjcghlvyfgpfjhi.supabase.co";
@@ -955,6 +963,8 @@ async function init() {
   if(currentUser){
     try {
     await loadMyProfile();
+    initDiaryVoiceComposer();
+    ChatComposer.mountDiary();
     await updateCoupleStatus();
     await updateFilterLabels(); // 更新筛选标签昵称
     await loadSiteTitle();
@@ -1004,6 +1014,7 @@ async function signUp(){
 }
 async function signOut(){
   stopVoiceRecording();
+  ChatComposer.clearAll();
   await sb.auth.signOut();
   await refreshUser();
 }
@@ -1183,6 +1194,7 @@ document.querySelectorAll(".main-tab").forEach(tab=>{
     this.classList.add("active");
     document.getElementById("panel-"+name).classList.add("active");
     if (name === "album") loadAlbum();
+    if (name === "todos") initTodos();
   }
 })
 
@@ -1213,20 +1225,24 @@ function pickMood(dom){
 
 async function saveDiary(){
   if(!currentUser) return alert("请先登录");
-  const content = document.getElementById("diary-content").value.trim();
-  if(!content) return alert("日记内容不能为空");
-
-  const {error} = await sb.from("diaries").insert({
-    author_id: currentUser.id,
-    content: content,
-    mood: selectedMood
-  })
-  if(error) return alert("保存失败："+error.message);
-  alert("✅日记保存成功！");
-  document.getElementById("diary-content").value = "";
-  document.querySelectorAll(".mood-item").forEach(i=>{ i.classList.remove("active"); i.setAttribute("aria-pressed", "false"); });
-  selectedMood = '';
-  await loadAllDiaries();
+  const input = document.getElementById("diary-content");
+  const content = input.value.trim();
+  const files = ChatComposer.getFiles('diary');
+  if(!content && !files.length) return alert("请写点文字或选择照片。");
+  try { validateChatImages(files); } catch (error) { return alert(error.message); }
+  const button = document.querySelector('button[onclick="saveDiary()"]');
+  button.disabled = true;
+  try {
+    const {data, error} = await sb.from("diaries").insert({author_id:currentUser.id, content:content || '[图片]', mood:selectedMood}).select('id').single();
+    if(error) throw error;
+    try { await uploadChatAttachments(files, data.id); }
+    catch (error) { console.error(error); alert('日记文字已保存，但照片上传失败，请重新选择照片发送。'); }
+    input.value = ''; ChatComposer.clear('diary');
+    document.querySelectorAll('.mood-item').forEach(i=>{i.classList.remove('active');i.setAttribute('aria-pressed','false')});
+    selectedMood = '';
+    await loadAllDiaries();
+  } catch(error) { console.error(error); alert('日记保存失败，请稍后重试。'); }
+  finally { button.disabled = false; }
 }
 
 // 加载全部日记
@@ -1354,6 +1370,7 @@ function renderDiaryList(){
       </div>
       ${moodFaces[item.mood] ? `<span class="mood-tag" aria-label="心情：${escapeHtml(item.mood)}">${moodIcon(item.mood)}</span>` : ''}
       <div class="diary-content">${escapeHtml(item.content)}</div>
+      <div class="chat-images" id="diary-images-${item.id}"></div>
       <div class="diary-actions">
         <button type="button" class="interaction-btn ${liked ? 'liked' : ''}" aria-pressed="${!!liked}" onclick="toggleLike('${item.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.3C5 7 9.1 5.9 12 9c2.9-3.1 7-2 7 1.7C19 15.6 12 20 12 20Z"/></svg><span>${liked ? '已赞' : '赞'}${likeCount ? ' · '+likeCount : ''}</span></button>
         <button type="button" class="interaction-btn" onclick="toggleComment('${item.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5h16v11H10l-4 3v-3H4z"/></svg><span data-comment-count="${item.id}">${commentCountMap[item.id] ? '评论 · ' + commentCountMap[item.id] : '评论'}</span></button>
@@ -1372,6 +1389,8 @@ function renderDiaryList(){
     </div>
     `
   }).join('');
+  renderDiaryVoiceNotes();
+  for (const item of list) renderChatAttachments(item.id, document.getElementById(`diary-images-${item.id}`));
 }
 
 // 点赞
@@ -1392,6 +1411,10 @@ async function deleteDiary(diaryId){
   const {data: voices, error: voiceError} = await sb.from("voice_comments").select("id").eq("diary_id", diaryId).limit(1);
   if(voiceError) return alert("无法检查语音留言，请稍后重试。");
   if(voices?.length) return alert("请先删除这条日记中的语音留言，再删除日记。");
+  try { if (!(await removeChatAttachments(diaryId))) return alert("请先让伴侣删除这条日记中的图片，再删除日记。"); }
+  catch(error) { console.error(error); return alert("图片清理失败，请稍后重试。"); }
+  try { await removeDiaryVoiceBeforeDelete(diaryId); }
+  catch (error) { console.error(error); return alert("语音清理失败，请稍后重试。"); }
   const {error} = await sb.from("diaries").delete().eq("id", diaryId);
   if(error) return alert("删除失败，请稍后重试。");
   alert("删除成功");
@@ -1405,6 +1428,7 @@ function toggleComment(diaryId){
   if(section.classList.contains("open")){
     loadComments(diaryId);
     renderVoiceComments(diaryId, document.getElementById(`voice-comments-${diaryId}`));
+    ChatComposer.mountComment(diaryId);
   } else {
     stopVoiceRecording();
   }
@@ -1436,33 +1460,39 @@ async function loadComments(diaryId){
     return `
     <div class="comment-item">
       <span class="comment-author">${escapeHtml(name)}：</span>
-      <span class="comment-content">${escapeHtml(c.content)}</span>
+      <span class="comment-content">${escapeHtml(c.content)}<span class="chat-images" id="comment-images-${c.id}"></span></span>
       ${isMyComment ? `<span class="comment-del" onclick="deleteComment('${c.id}','${diaryId}')">删除</span>` : ''}
     </div>
     `
   }).join('');
+  for (const c of list) renderChatAttachments(diaryId, document.getElementById(`comment-images-${c.id}`), c.id);
 }
 
 // 发送评论
 async function sendComment(diaryId){
   const input = document.getElementById(`comment-input-${diaryId}`);
   const content = input.value.trim();
-  if(!content) return;
-
-  const {error} = await sb.from("diaries_comments").insert({
-    diary_id: diaryId,
-    user_id: currentUser.id,
-    content: content
-  });
-
-  if(error) return alert("评论失败："+error.message);
-  input.value = '';
-  await Promise.all([loadComments(diaryId), refreshCommentCounts()]);
+  const files = ChatComposer.getFiles(diaryId);
+  if(!content && !files.length) return;
+  try { validateChatImages(files); } catch(error) { return alert(error.message); }
+  const button = input.parentElement.querySelector('button[onclick^="sendComment"]');
+  button.disabled = true;
+  try {
+    const {data,error} = await sb.from("diaries_comments").insert({diary_id:diaryId,user_id:currentUser.id,content:content || '[图片]'}).select('id').single();
+    if(error) throw error;
+    try { await uploadChatAttachments(files, diaryId, data.id); }
+    catch(error) { console.error(error); alert('文字已发送，但照片上传失败，请重新选择照片发送。'); }
+    input.value=''; ChatComposer.clear(diaryId);
+    await Promise.all([loadComments(diaryId), refreshCommentCounts()]);
+  } catch(error) { console.error(error); alert('评论发送失败，请稍后重试。'); }
+  finally { button.disabled = false; }
 }
 
 // 删除评论
 async function deleteComment(commentId, diaryId){
   if(!confirm("确定删除这条评论吗？")) return;
+  try { if (!(await removeChatAttachments(diaryId, commentId))) return alert("请先删除此评论中的图片。"); }
+  catch(error) { console.error(error); return alert("图片清理失败，请稍后重试。"); }
   const {error} = await sb.from("diaries_comments").delete().eq("id", commentId);
   if (error) return alert("删除失败，请稍后重试。");
   await Promise.all([loadComments(diaryId), refreshCommentCounts()]);

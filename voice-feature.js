@@ -33,7 +33,7 @@ async function renderVoiceComments(diaryId, mount) {
   const inputRow = mount.parentElement.querySelector('.comment-input-box');
   let modeToggle = inputRow.querySelector('.voice-mode-toggle');
   if (!modeToggle) { modeToggle=document.createElement('button'); modeToggle.type='button'; modeToggle.className='voice-mode-toggle'; inputRow.prepend(modeToggle); }
-  const textInput = inputRow.querySelector('input'); const textSend = [...inputRow.querySelectorAll('button')].find(button => button !== modeToggle);
+  const textInput = inputRow.querySelector('input'); const textSend = inputRow.querySelector('button[onclick^="sendComment"]');
   let voiceMode = false;
   function setMode(voice) {
     voiceMode=voice; modeToggle.textContent=voice ? '⌨' : '◉'; modeToggle.setAttribute('aria-label',voice ? '切换文字输入' : '切换语音输入');
@@ -120,7 +120,9 @@ async function renderVoiceComments(diaryId, mount) {
   });
   discard.addEventListener('click', () => { recordingId++; stopVoiceRecording(); blob=null; clearPreview(); transcript.value=''; transcript.hidden=true; send.hidden=true; discard.hidden=true; dictated.hidden=true; recorderButton.textContent='点击录音'; status.textContent=''; });
   send.addEventListener('click', async () => {
-    if(!blob || currentUser?.id !== uid) return; send.disabled=true; recorderButton.disabled=true; status.textContent='正在发送…';
+    if(!blob || currentUser?.id !== uid) return;
+    if (window.ChatComposer?.getFiles(diaryId).length) { status.textContent = '请先用文字模式发送照片，再发送语音。'; return; }
+    send.disabled=true; recorderButton.disabled=true; status.textContent='正在发送…';
     const extension = blob.type.includes('webm') ? 'webm' : 'm4a'; const path = `${uid}/${crypto.randomUUID()}.${extension}`;
     let uploaded=false;
     try {
@@ -174,7 +176,9 @@ function initDiaryVoiceComposer() {
   });
   cancel.addEventListener('click',()=>{token++;stopVoiceRecording();blob=null;clearPreview();record.textContent='点击录音';cancel.hidden=true;submit.hidden=true;status.textContent='';});
   submit.addEventListener('click',async()=>{
-    if(!blob||!currentUser)return; const uid=currentUser.id, savedBlob=blob; submit.disabled=true;record.disabled=true;status.textContent='正在保存…';
+    if(!blob||!currentUser)return;
+    if (window.ChatComposer?.getFiles('diary').length) { status.textContent='请先用文字模式发送照片，再保存语音日记。'; return; }
+    const uid=currentUser.id, savedBlob=blob; submit.disabled=true;record.disabled=true;status.textContent='正在保存…';
     let path=null, diaryId=null, committed=false;
     try {
       const ext=savedBlob.type.includes('webm')?'webm':'m4a';path=`${uid}/${crypto.randomUUID()}.${ext}`;
