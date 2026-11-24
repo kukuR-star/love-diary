@@ -4,3 +4,25 @@
 .todo-calendar{margin-top:18px;border-radius:12px;background:#f4f7f4;padding:14px}.todo-calendar summary{cursor:pointer;font-weight:600;color:#52695a;list-style:none}.todo-calendar summary::-webkit-details-marker{display:none}.todo-calendar summary span{font-size:13px;font-weight:400;color:#98a39a;float:right}.todo-calendar-nav{display:flex;justify-content:space-between;align-items:center;margin:12px 0 8px}.todo-calendar-nav button{padding:2px 12px;min-height:34px;background:#e6eee8;color:#566d5d;font-size:20px}.todo-week,.todo-calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}.todo-week{color:#9aa79d;font-size:12px}.todo-calendar-day{min-width:0;min-height:38px;padding:5px;background:transparent;color:#56645a;border-radius:9px;position:relative;box-shadow:none}.todo-calendar-day[aria-pressed=true]{background:#688b76;color:#fff}.todo-calendar-day.today{outline:1px solid #8ba591}.todo-calendar-day.has-task:after{content:'';width:4px;height:4px;border-radius:50%;background:#7c9f87;position:absolute;bottom:3px;left:calc(50% - 2px)}.todo-calendar-day[aria-pressed=true]:after{background:white}
 .todo-list-heading{display:flex;justify-content:space-between;align-items:center;margin-top:22px}.todo-list-heading h3{font-size:16px;color:#405448}.todo-list-heading button,.todo-remove{padding:6px;color:#98a59b;background:transparent;font-size:13px;box-shadow:none}.todo-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid #edf0ed}.todo-check{width:27px;height:27px;min-height:27px;flex:none;padding:0;border-radius:50%;border:1px solid #b7c6ba;background:white;color:white;box-shadow:none}.todo-row.is-done .todo-check{background:#7c9e87;border-color:#7c9e87}.todo-check:disabled{opacity:.6}.todo-body{flex:1;min-width:0}.todo-title{font-size:15px;color:#43534a;overflow-wrap:anywhere}.todo-row.is-done .todo-title{text-decoration:line-through;color:#a0aaa2}.todo-meta{font-size:12px;color:#9ba69e;margin-top:5px}.todo-empty{font-size:14px;text-align:center;color:#a1aca3;padding:24px 0}.todo-status{font-size:13px;color:#839188}.todo-status.is-error{color:#ae6058}.todo-visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
 @media(max-width:480px){.todo-shell{padding:18px}.todo-form input[type=date]{font-size:14px}.todo-calendar-day{min-height:36px}}
+/* Notes-style checklist: large touch target with a smaller visible ring. */
+.todo-check,.todo-check:hover,.todo-check:focus-visible{position:relative;width:44px;height:44px;min-width:44px;min-height:44px;display:grid;place-items:center;border:0;border-radius:50%;background:transparent;color:inherit;box-shadow:none;transform:none;padding:0}
+.todo-check::before{content:'';width:22px;height:22px;border:1.5px solid #a9b6ad;border-radius:50%;background:#fff;box-sizing:border-box}
+.todo-row.is-done .todo-check,.todo-row.is-done .todo-check:hover{background:transparent;border:0}
+.todo-row.is-done .todo-check::before{background:#789681;border-color:#789681}
+.todo-row.is-done .todo-check::after{content:'✓';position:absolute;color:#fff;font-size:15px;line-height:1;font-weight:700}
+.todo-check:focus-visible{outline:2px solid #6f8977;outline-offset:1px}
+.todo-row{gap:5px;padding:8px 0;align-items:flex-start}.todo-body{padding-top:3px}
+.todo-title[type=text]{display:block;box-sizing:border-box;width:100%;min-width:0;min-height:38px;margin:0;padding:6px 2px;border:0;border-radius:0;outline:none;background:transparent;box-shadow:none;color:#43534a;font-size:16px;line-height:1.5}
+.todo-title[type=text]:focus{background:#f5f7f5;box-shadow:0 1px 0 #789681}
+.todo-row.is-done .todo-title[type=text]{text-decoration:line-through;color:#a0aaa2}
+.todo-meta{padding:0 2px;margin-top:0}
+/* Reuse the diary calendar's layout, colours and marked-day treatment. */
+.todo-calendar{background:transparent;border:0;padding:0;margin-top:18px}
+.todo-calendar summary{padding:8px 0}
+.todo-calendar-nav{margin:10px 0}
+.todo-week{margin-bottom:6px}
+.todo-calendar-day{aspect-ratio:1;min-height:0;width:100%;padding:0;border:0;font-weight:400;font-size:14px;box-shadow:none}
+.todo-calendar-day.has-diary{font-weight:500}
+.todo-calendar-day[aria-pressed=true]{background:var(--accent);color:#fff}
+.todo-calendar-day.today{outline:none}
+.todo-calendar-day.selected.has-diary::after{background:#fff}

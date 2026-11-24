@@ -10,6 +10,23 @@ function stopVoiceRecording() {
   if (activeSpeechRecognition) { try { activeSpeechRecognition.stop(); } catch {} activeSpeechRecognition = null; }
 }
 window.addEventListener('pagehide', stopVoiceRecording);
+// If microphone permission is granted after release, never start a hidden recording.
+function installVoiceHold(button, start, finish) {
+  let held=false, cancelled=false, startY=0;
+  button.style.touchAction='none';
+  button.addEventListener('pointerdown', async e => {
+    if(e.button !== 0 || held) return; e.preventDefault();
+    held=true; cancelled=false; startY=e.clientY;
+    try { button.setPointerCapture(e.pointerId); } catch {}
+    await start(() => held && !cancelled);
+  });
+  button.addEventListener('pointermove', e => { if(held && e.clientY < startY-60) cancelled=true; });
+  const end=(e,abort)=>{if(!held)return;held=false;finish(!abort&&!cancelled);};
+  button.addEventListener('pointerup',e=>end(e,false));
+  button.addEventListener('pointercancel',e=>end(e,true));
+  button.addEventListener('lostpointercapture',e=>end(e,true));
+}
+
 
 async function renderVoiceComments(diaryId, mount) {
   if (!mount || !currentUser) return;
@@ -31,16 +48,19 @@ async function renderVoiceComments(diaryId, mount) {
   const actions = document.createElement('div'); actions.className = 'voice-actions'; actions.append(recorderButton, preview, dictated, send, discard);
   section.append(list,actions,transcript,note,status); mount.append(section);
   const inputRow = mount.parentElement.querySelector('.comment-input-box');
+  inputRow.querySelectorAll('.voice-hold').forEach(old => old.remove());
   let modeToggle = inputRow.querySelector('.voice-mode-toggle');
   if (!modeToggle) { modeToggle=document.createElement('button'); modeToggle.type='button'; modeToggle.className='voice-mode-toggle'; inputRow.prepend(modeToggle); }
-  const textInput = inputRow.querySelector('input'); const textSend = inputRow.querySelector('button[onclick^="sendComment"]');
-  let voiceMode = false;
+  const textInput = inputRow.querySelector('textarea, input:not([type=file])'); const textSend = inputRow.querySelector('button[onclick^="sendComment"]');
+  let voiceMode = false; let holdSend = false;
   function setMode(voice) {
     voiceMode=voice; modeToggle.textContent=voice ? '⌨' : '◉'; modeToggle.setAttribute('aria-label',voice ? '切换文字输入' : '切换语音输入');
-    textInput.hidden=voice; textSend.hidden=voice; actions.hidden=!voice; transcript.hidden=true; note.hidden=!voice;
-    if (!voice) { recordingId++; stopVoiceRecording(); blob=null; clearPreview(); recorderButton.textContent='点击录音'; send.hidden=true; discard.hidden=true; }
+    textInput.hidden=voice; textSend.hidden=voice; actions.hidden=!voice; recorderButton.hidden=!voice; transcript.hidden=true; note.hidden=true;
+    if (voice) recorderButton.textContent='按住说话，松开发送';
+    if (!voice) { recordingId++; stopVoiceRecording(); blob=null; clearPreview(); recorderButton.textContent='按住说话，松开发送'; send.hidden=true; discard.hidden=true; }
   }
   let blob = null; let recordingId = 0;
+  textInput.after(recorderButton); recorderButton.classList.add('voice-hold'); recorderButton.textContent='按住说话，松开发送'; recorderButton.hidden=true;
   modeToggle.onclick=()=>setMode(!voiceMode); setMode(false);
   async function load() {
     const {data, error} = await sb.from('voice_comments').select('id,owner_id,audio_path,transcript,created_at').eq('diary_id',diaryId).order('created_at');
@@ -78,13 +98,14 @@ async function renderVoiceComments(diaryId, mount) {
       list.append(row);
     }
   }
-  recorderButton.addEventListener('click', async () => {
+  installVoiceHold(recorderButton, async (isHeld) => {
+    holdSend=false;
     if (activeVoiceRecording) { if (activeVoiceRecording.mount === mount) stopVoiceRecording(); else status.textContent='请先完成正在录制的语音。'; return; }
     if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { status.textContent='当前浏览器不支持录音。'; return; }
     let stream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({audio:true});
-      if(!section.isConnected || currentUser?.id !== uid) { stream.getTracks().forEach(t=>t.stop()); return; }
+      if(!section.isConnected || currentUser?.id !== uid || !isHeld()) { stream.getTracks().forEach(t=>t.stop()); if(section.isConnected && currentUser?.id===uid)status.textContent='请再次按住说话。'; return; }
       const type = ['audio/mp4','audio/webm;codecs=opus','audio/webm'].find(t => MediaRecorder.isTypeSupported(t));
       const recorder = type ? new MediaRecorder(stream, {mimeType:type}) : new MediaRecorder(stream);
       const chunks = []; const thisRecording = ++recordingId;
@@ -92,19 +113,19 @@ async function renderVoiceComments(diaryId, mount) {
       recorder.onerror = () => { status.textContent = '录音失败，请重试。'; };
       recorder.onstop = () => {
         stream.getTracks().forEach(t=>t.stop()); clearTimeout(activeVoiceRecording?.timer); activeVoiceRecording = null;
-        if (thisRecording !== recordingId || !section.isConnected) return;
+        if (thisRecording !== recordingId || !section.isConnected || !holdSend) { status.textContent='已取消'; recorderButton.textContent='按住说话，松开发送'; return; }
         blob = new Blob(chunks,{type:recorder.mimeType || type || 'audio/mp4'});
-        if (!blob.size) { status.textContent='没有录到声音，请重试。'; recorderButton.textContent='点击录音'; return; }
+        if (!blob.size) { status.textContent='没有录到声音，请重试。'; recorderButton.textContent='按住说话，松开发送'; return; }
         clearPreview(); previewUrl=URL.createObjectURL(blob); preview.src=previewUrl; preview.hidden=false;
-        recorderButton.textContent='重新录制'; transcript.hidden = false; send.hidden=false; discard.hidden=false; dictated.hidden=true; status.textContent='录制完成，可编辑文字后发送。';
+        recorderButton.textContent='按住说话，松开发送'; send.hidden=false; send.click();
       };
       recorder.start();
-      activeVoiceRecording = {recorder, stream, mount, timer:setTimeout(stopVoiceRecording,60000)};
-      blob=null; clearPreview(); transcript.value=''; transcript.hidden=false; send.hidden=true; discard.hidden=true;
-      dictated.hidden=!(window.SpeechRecognition || window.webkitSpeechRecognition);
-      recorderButton.textContent='停止录音'; status.textContent='正在录音… 最长 60 秒';
+      activeVoiceRecording = {recorder, stream, mount, timer:setTimeout(()=>{holdSend=true;stopVoiceRecording();},60000)};
+      blob=null; clearPreview(); transcript.value=''; transcript.hidden=true; send.hidden=true; discard.hidden=true;
+      dictated.hidden=true;
+      recorderButton.textContent='松开发送，上滑取消'; status.textContent='正在录音… 最长 60 秒';
     } catch(e) { stream?.getTracks().forEach(t=>t.stop()); console.error(e); status.textContent='无法使用麦克风，请检查 Safari 的麦克风权限。'; }
-  });
+  }, (sendIt)=>{holdSend=sendIt; if(activeVoiceRecording?.mount===mount) stopVoiceRecording();});
   dictated.addEventListener('click', () => {
     if (!activeVoiceRecording || activeVoiceRecording.mount !== mount) return;
     if(activeSpeechRecognition) { activeSpeechRecognition.stop(); activeSpeechRecognition=null; dictated.textContent='实时听写'; return; }
@@ -118,7 +139,7 @@ async function renderVoiceComments(diaryId, mount) {
       recognition.start(); activeSpeechRecognition=recognition; dictated.textContent='停止听写';
     } catch(e) { console.error(e); status.textContent='实时听写不可用，可手动填写文字。'; }
   });
-  discard.addEventListener('click', () => { recordingId++; stopVoiceRecording(); blob=null; clearPreview(); transcript.value=''; transcript.hidden=true; send.hidden=true; discard.hidden=true; dictated.hidden=true; recorderButton.textContent='点击录音'; status.textContent=''; });
+  discard.addEventListener('click', () => { recordingId++; stopVoiceRecording(); blob=null; clearPreview(); transcript.value=''; transcript.hidden=true; send.hidden=true; discard.hidden=true; dictated.hidden=true; recorderButton.textContent='按住说话，松开发送'; status.textContent=''; });
   send.addEventListener('click', async () => {
     if(!blob || currentUser?.id !== uid) return;
     if (window.ChatComposer?.getFiles(diaryId).length) { status.textContent = '请先用文字模式发送照片，再发送语音。'; return; }
@@ -128,7 +149,7 @@ async function renderVoiceComments(diaryId, mount) {
     try {
       const upload=await sb.storage.from(VOICE_BUCKET).upload(path,blob,{contentType:blob.type.split(';')[0],upsert:false}); if(upload.error) throw upload.error; uploaded=true;
       const result=await sb.from('voice_comments').insert({diary_id:diaryId,owner_id:uid,audio_path:path,transcript:transcript.value.trim() || null}); if(result.error) throw result.error;
-      blob=null; clearPreview(); transcript.value=''; transcript.hidden=true; send.hidden=true; discard.hidden=true; recorderButton.textContent='点击录音'; status.textContent=''; await load();
+      blob=null; clearPreview(); transcript.value=''; transcript.hidden=true; send.hidden=true; discard.hidden=true; recorderButton.textContent='按住说话，松开发送'; status.textContent=''; await load();
       if (typeof refreshCommentCounts === 'function') await refreshCommentCounts();
     } catch(e) { if(uploaded) await sb.storage.from(VOICE_BUCKET).remove([path]); console.error(e); status.textContent='发送失败，请检查网络后重试。'; }
     finally { send.disabled=false; recorderButton.disabled=false; }
@@ -144,37 +165,39 @@ function initDiaryVoiceComposer() {
   const shell = document.createElement('div'); shell.id='diary-voice-composer'; shell.className='diary-voice-composer';
   const toggle = document.createElement('button'); toggle.type='button'; toggle.className='voice-mode-toggle';
   const actions = document.createElement('div'); actions.className='voice-actions'; actions.hidden=true;
-  const record = document.createElement('button'); record.type='button'; record.className='voice-button'; record.textContent='点击录音';
+  const record = document.createElement('button'); record.type='button'; record.className='voice-button'; record.textContent='按住说话，松开发送';
   const preview = document.createElement('audio'); preview.controls=true; preview.hidden=true;
   const cancel = document.createElement('button'); cancel.type='button'; cancel.className='voice-discard'; cancel.textContent='取消'; cancel.hidden=true;
   const submit = document.createElement('button'); submit.type='button'; submit.className='voice-send diary-voice-submit'; submit.textContent='保存日记'; submit.setAttribute('aria-label','保存语音日记'); submit.hidden=true;
   const status = document.createElement('p'); status.className='voice-status'; status.setAttribute('role','status');
   actions.append(record,preview,cancel,submit); shell.append(toggle,actions,status); text.before(shell);
-  let voiceMode=false, blob=null, previewUrl=null, token=0;
+  let voiceMode=false, blob=null, previewUrl=null, token=0, holdSend=false;
   const clearPreview=()=>{ if(previewUrl) URL.revokeObjectURL(previewUrl); previewUrl=null; preview.hidden=true; preview.removeAttribute('src'); };
-  function setMode(voice) { voiceMode=voice; toggle.textContent=voice?'⌨':'◉'; toggle.setAttribute('aria-label',voice?'切换文字输入':'切换语音输入'); text.hidden=voice; save.hidden=voice; actions.hidden=!voice; if(!voice) { token++; stopVoiceRecording(); blob=null; clearPreview(); record.textContent='点击录音'; submit.hidden=true; cancel.hidden=true; status.textContent=''; } }
+  function setMode(voice) { voiceMode=voice; toggle.textContent=voice?'⌨':'◉'; toggle.setAttribute('aria-label',voice?'切换文字输入':'切换语音输入'); text.hidden=voice; save.hidden=voice; actions.hidden=!voice; record.hidden=!voice; if(!voice) { token++; stopVoiceRecording(); blob=null; clearPreview(); record.textContent='按住说话，松开发送'; submit.hidden=true; cancel.hidden=true; status.textContent=''; } }
+  text.after(record); record.classList.add('voice-hold'); record.textContent='按住说话，松开发送'; record.hidden=true;
   toggle.addEventListener('click',()=>setMode(!voiceMode)); setMode(false);
-  record.addEventListener('click',async()=>{
+  installVoiceHold(record,async(isHeld)=>{
+    holdSend=false;
     if(activeVoiceRecording) { if(activeVoiceRecording.mount===shell) stopVoiceRecording(); else status.textContent='请先完成另一条录音。'; return; }
     if(!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {status.textContent='当前浏览器不支持录音。'; return;}
     let stream;
     try {
       const uid=currentUser?.id; if(!uid) return;
       stream=await navigator.mediaDevices.getUserMedia({audio:true});
-      if(!voiceMode || !shell.isConnected || uid!==currentUser?.id) {stream.getTracks().forEach(t=>t.stop());return;}
+      if(!voiceMode || !shell.isConnected || uid!==currentUser?.id || !isHeld()) {stream.getTracks().forEach(t=>t.stop());if(voiceMode && shell.isConnected && uid===currentUser?.id)status.textContent='请再次按住说话。';return;}
       const supported=['audio/mp4','audio/webm;codecs=opus','audio/webm'].find(t=>MediaRecorder.isTypeSupported(t));
       const recorder=supported?new MediaRecorder(stream,{mimeType:supported}):new MediaRecorder(stream);
       const parts=[]; const current=++token;
       recorder.ondataavailable=e=>{if(e.data.size)parts.push(e.data)};
       recorder.onstop=()=>{stream.getTracks().forEach(t=>t.stop());if(activeVoiceRecording?.recorder===recorder){clearTimeout(activeVoiceRecording.timer);activeVoiceRecording=null;}
-        if(current!==token || !shell.isConnected)return;
+        if(current!==token || !shell.isConnected || !holdSend){status.textContent='已取消';record.textContent='按住说话，松开发送';return;}
         blob=new Blob(parts,{type:recorder.mimeType||supported||'audio/mp4'});clearPreview();
-        if(!blob.size){status.textContent='没有录到声音，请重试。'; record.textContent='点击录音';return;}
-        previewUrl=URL.createObjectURL(blob); preview.src=previewUrl;preview.hidden=false;cancel.hidden=false;submit.hidden=false;record.textContent='重新录制';status.textContent='录音完成，可以先试听。';};
-      blob=null;clearPreview();submit.hidden=true;cancel.hidden=false;recorder.start();activeVoiceRecording={recorder,stream,mount:shell,timer:setTimeout(stopVoiceRecording,60000)};record.textContent='停止';status.textContent='正在录音，最长 60 秒';
+        if(!blob.size){status.textContent='没有录到声音，请重试。'; record.textContent='按住说话，松开发送';return;}
+        submit.hidden=false; record.textContent='按住说话，松开发送'; submit.click();};
+      blob=null;clearPreview();submit.hidden=true;cancel.hidden=false;recorder.start();activeVoiceRecording={recorder,stream,mount:shell,timer:setTimeout(()=>{holdSend=true;stopVoiceRecording();},60000)};record.textContent='停止';status.textContent='正在录音，最长 60 秒';
     } catch(e){stream?.getTracks().forEach(t=>t.stop());console.error(e);status.textContent='无法使用麦克风，请检查浏览器权限。';}
-  });
-  cancel.addEventListener('click',()=>{token++;stopVoiceRecording();blob=null;clearPreview();record.textContent='点击录音';cancel.hidden=true;submit.hidden=true;status.textContent='';});
+  },(sendIt)=>{holdSend=sendIt;if(activeVoiceRecording?.mount===shell)stopVoiceRecording();});
+  cancel.addEventListener('click',()=>{token++;stopVoiceRecording();blob=null;clearPreview();record.textContent='按住说话，松开发送';cancel.hidden=true;submit.hidden=true;status.textContent='';});
   submit.addEventListener('click',async()=>{
     if(!blob||!currentUser)return;
     if (window.ChatComposer?.getFiles('diary').length) { status.textContent='请先用文字模式发送照片，再保存语音日记。'; return; }
@@ -185,7 +208,7 @@ function initDiaryVoiceComposer() {
       const upload=await sb.storage.from(VOICE_BUCKET).upload(path,savedBlob,{contentType:savedBlob.type.split(';')[0],upsert:false});if(upload.error)throw upload.error;
       const diary=await sb.from('diaries').insert({author_id:uid,content:text.value.trim()||'语音日记',mood:selectedMood}).select('id').single();if(diary.error)throw diary.error;diaryId=diary.data.id;
       const note=await sb.from('diary_voice_notes').insert({diary_id:diaryId,owner_id:uid,audio_path:path});if(note.error)throw note.error;committed=true;
-      blob=null;clearPreview();text.value='';selectedMood='';document.querySelectorAll('.mood-item').forEach(i=>{i.classList.remove('active');i.setAttribute('aria-pressed','false')});setMode(false);await loadAllDiaries();
+      blob=null;clearPreview();text.value='';window.ChatComposer?.sync('diary');selectedMood='';document.querySelectorAll('.mood-item').forEach(i=>{i.classList.remove('active');i.setAttribute('aria-pressed','false')});setMode(false);await loadAllDiaries();
     } catch(e){console.error(e);if(committed){alert('日记已保存，页面刷新失败，请稍后刷新。');return;}let cleanupFailed=false;if(diaryId){const result=await sb.from('diaries').delete().eq('id',diaryId).eq('author_id',uid);cleanupFailed=!!result.error;}if(path){const result=await sb.storage.from(VOICE_BUCKET).remove([path]);cleanupFailed=cleanupFailed||!!result.error;}status.textContent=cleanupFailed?'保存失败，清理未完全成功，请检查日记。':'保存失败，请稍后重试。';}
     finally{submit.disabled=false;record.disabled=false;}
   });

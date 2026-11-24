@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title id="page-title">💖 我们的恋爱小屋</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <title id="page-title">💖 恋爱小屋</title>
+  <script src="vendor/supabase-2.119.2.js"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -698,7 +698,7 @@
 <body>
 <div class="container">
   <div class="header">
-    <h1 id="site-title" onclick="editTitle()">💖 我们的恋爱小屋</h1>
+    <h1 id="site-title" onclick="editTitle()">💖 恋爱小屋</h1>
     <div class="user-bar">
       <button type="button" class="user-info-click" onclick="openProfileModal()" aria-label="个人设置">
         <img id="user-avatar-img" class="avatar-img" src="" style="display:none;">
@@ -713,6 +713,7 @@
     <h3>登录 / 注册</h3>
     <input type="email" id="login-email" autocomplete="email" placeholder="请输入邮箱">
     <input type="password" id="login-pwd" autocomplete="current-password" placeholder="请输入密码">
+    <p id="login-status" role="status" aria-live="polite" style="font-size:14px;color:#6b7670;margin:4px 0;"></p>
     <div class="auth-btn-group">
       <button onclick="signIn()">登录</button>
       <button class="secondary" onclick="signUp()">注册</button>
@@ -742,7 +743,7 @@
     <div class="panel active" id="panel-diary">
       <div class="card">
         <h4>✍️ 写新日记</h4>
-        <textarea id="diary-content" placeholder="记录今天的小故事..."></textarea>
+        <textarea id="diary-content" rows="1" enterkeyhint="send" placeholder="记录今天的小故事..."></textarea>
         <p style="font-size:14px;color:#888;margin:8px 0 4px;">今日心情</p>
         <div class="mood-picker" id="mood-picker" role="group" aria-label="选择今日心情"></div>
         <button aria-label="保存日记" title="保存日记" onclick="saveDiary()" style="width:100%;margin-top:6px;">保存日记</button>
@@ -929,11 +930,12 @@
 <script src="todos-feature.js"></script>
 <script src="chat-composer.js"></script>
 <script src="attachment-feature.js"></script>
+<script src="wish-date.js"></script>
 <script>
 // ===================== Supabase 配置 =====================
 const SUPABASE_URL = "https://bxiiapjcghlvyfgpfjhi.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_mQ_pZNPxV_lOYTGmVBzojg_27dBUx1G";
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = window.supabase?.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) || null;
 
 // ===================== 全局变量 =====================
 let currentUser = null;
@@ -1000,13 +1002,31 @@ async function refreshUser(){
 }
 
 async function signIn(){
+  if (!sb) return alert("登录组件暂时无法加载，请检查网络并刷新页面，或切换 Wi-Fi / 蜂窝网络后重试。");
   const email = document.getElementById("login-email").value.trim();
   const password = document.getElementById("login-pwd").value;
-  const {error} = await sb.auth.signInWithPassword({email,password});
-  if(error) return alert(error.message);
-  await init();
+  if (!email || !password) return alert("请输入邮箱和密码。");
+  const button = document.querySelector('button[onclick="signIn()"]');
+  button.disabled = true;
+  const status = document.getElementById("login-status");
+  status.textContent = "正在登录…";
+  const slowNotice = setTimeout(() => { status.textContent = "连接较慢，请稍候；也可以切换网络后刷新重试。"; }, 8000);
+  try {
+    const {error} = await sb.auth.signInWithPassword({email,password});
+    if (error) {
+      if (error.name === 'AuthRetryableFetchError' || /fetch|network/i.test(error.message || '')) return alert("无法连接登录服务，请切换网络后重试。");
+      if (error.message?.toLowerCase().includes('invalid login credentials')) return alert("邮箱或密码不正确，请检查后重试。");
+      if (error.message?.toLowerCase().includes('email not confirmed')) return alert("邮箱尚未确认，请检查注册邮件。");
+      return alert("登录失败：" + (error.message || "请稍后重试。"));
+    }
+    await init();
+  } catch (error) {
+    console.error('登录请求失败', error);
+    alert("无法连接登录服务，请切换网络后重试。");
+  } finally { clearTimeout(slowNotice); status.textContent = ""; button.disabled = false; }
 }
 async function signUp(){
+  if (!sb) return alert("登录组件暂时无法加载，请检查网络并刷新页面。");
   const email = document.getElementById("login-email").value.trim();
   const password = document.getElementById("login-pwd").value;
   const {error} = await sb.auth.signUp({email,password});
@@ -1216,7 +1236,7 @@ async function saveDiary(){
   if(!content && !files.length) return alert("请写点文字或选择照片。");
   try { validateChatImages(files); } catch (error) { return alert(error.message); }
   const button = document.querySelector('button[onclick="saveDiary()"]');
-  button.disabled = true;
+  button.dataset.busy = "1"; button.disabled = true;
   try {
     const {data, error} = await sb.from("diaries").insert({author_id:currentUser.id, content:content || '[图片]', mood:selectedMood}).select('id').single();
     if(error) throw error;
@@ -1227,7 +1247,7 @@ async function saveDiary(){
     selectedMood = '';
     await loadAllDiaries();
   } catch(error) { console.error(error); alert('日记保存失败，请稍后重试。'); }
-  finally { button.disabled = false; }
+  finally { delete button.dataset.busy; ChatComposer.sync("diary"); }
 }
 
 // 加载全部日记
@@ -1366,7 +1386,7 @@ function renderDiaryList(){
           <div class="empty" style="padding:10px 0;">暂无评论</div>
         </div>
         <div class="comment-input-box">
-          <input type="text" placeholder="写下你的评论..." id="comment-input-${item.id}">
+          <textarea rows="1" enterkeyhint="send" placeholder="写下你的评论..." aria-label="评论内容" id="comment-input-${item.id}"></textarea>
           <button onclick="sendComment('${item.id}')">发送</button>
         </div>
         <div id="voice-comments-${item.id}"></div>
@@ -1461,7 +1481,7 @@ async function sendComment(diaryId){
   if(!content && !files.length) return;
   try { validateChatImages(files); } catch(error) { return alert(error.message); }
   const button = input.parentElement.querySelector('button[onclick^="sendComment"]');
-  button.disabled = true;
+  button.dataset.busy = "1"; button.disabled = true;
   try {
     const {data,error} = await sb.from("diaries_comments").insert({diary_id:diaryId,user_id:currentUser.id,content:content || '[图片]'}).select('id').single();
     if(error) throw error;
@@ -1470,7 +1490,7 @@ async function sendComment(diaryId){
     input.value=''; ChatComposer.clear(diaryId);
     await Promise.all([loadComments(diaryId), refreshCommentCounts()]);
   } catch(error) { console.error(error); alert('评论发送失败，请稍后重试。'); }
-  finally { button.disabled = false; }
+  finally { delete button.dataset.busy; ChatComposer.sync(diaryId); }
 }
 
 // 删除评论
@@ -1689,6 +1709,7 @@ async function addWish(){
   if(error) return alert("添加失败："+error.message);
   document.getElementById("wish-input").value = "";
   document.getElementById("wish-deadline").value = "";
+  window.refreshWishDate?.();
   loadWishList();
 }
 
@@ -1733,7 +1754,11 @@ async function deleteWish(id){
 }
 
 // 启动
-init().catch(error => { console.error(error); alert("无法连接登录服务，请检查网络后刷新页面。"); });
+if (sb) init().catch(error => { console.error(error); alert("无法连接登录服务，请检查网络后刷新页面。"); });
+else {
+  document.getElementById("user-info").textContent = "连接失败，请刷新重试";
+  document.getElementById("login-status").textContent = "登录组件暂时无法加载，请切换网络后刷新页面。";
+}
 </script>
 </body>
 </html>
