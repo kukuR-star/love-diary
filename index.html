@@ -693,6 +693,7 @@
   <link rel="stylesheet" href="todos-feature.css">
   <link rel="stylesheet" href="chat-composer.css">
   <link rel="stylesheet" href="attachment-feature.css">
+  <link rel="stylesheet" href="mobile-refine.css">
 </head>
 <body>
 <div class="container">
@@ -731,8 +732,8 @@
     <!-- 主Tab -->
     <div class="main-tabs">
       <button class="main-tab active" data-tab="diary">📝 生活日记</button>
-      <button class="main-tab" data-tab="flower">🌸 小红花奖励</button>
       <button class="main-tab" data-tab="todos">待办</button>
+      <button class="main-tab" data-tab="flower">🌸 小红花奖励</button>
       <button class="main-tab" data-tab="wish">🎁 许愿礼物</button>
       <button class="main-tab" data-tab="album">相册</button>
     </div>
@@ -744,7 +745,7 @@
         <textarea id="diary-content" placeholder="记录今天的小故事..."></textarea>
         <p style="font-size:14px;color:#888;margin:8px 0 4px;">今日心情</p>
         <div class="mood-picker" id="mood-picker" role="group" aria-label="选择今日心情"></div>
-        <button onclick="saveDiary()" style="width:100%;margin-top:6px;">保存日记</button>
+        <button aria-label="保存日记" title="保存日记" onclick="saveDiary()" style="width:100%;margin-top:6px;">保存日记</button>
       </div>
 
       <div class="card">

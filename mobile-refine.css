@@ -1,0 +1,29 @@
+/* Compact mobile composer and action control. */
+#diary-chat-row { gap:3px; padding:6px; border-radius:10px; background:#f1f3f1; }
+#diary-chat-row textarea { min-height:40px; height:40px; max-height:104px; resize:none; overflow-y:auto; }
+#diary-chat-row button[onclick="saveDiary()"], #diary-voice-composer .diary-voice-submit {
+  width:38px!important; min-width:38px; height:38px; min-height:38px;
+  padding:0!important; display:inline-grid; place-items:center; border-radius:9px;
+  background:#718f7b; color:#fff; font-size:0; line-height:1;
+}
+#diary-chat-row button[onclick="saveDiary()"]::after,
+#diary-voice-composer .diary-voice-submit::after { content:'✓'; font-size:20px; font-weight:600; }
+#diary-voice-composer { margin-top:6px; }
+/* Native date controls can retain intrinsic minimum widths on iOS. */
+.todo-form { grid-template-columns:minmax(0,1fr) 44px; gap:8px; }
+.todo-form input, .todo-form input[type="date"], #wish-input, #wish-deadline {
+  box-sizing:border-box; min-width:0; max-width:100%; width:100%; margin:0; font-size:16px;
+}
+.todo-form input:first-of-type { grid-column:1 / -1; }
+.todo-form input[type="date"] { grid-column:1; grid-row:2; height:42px; min-height:42px; padding:8px 10px; }
+.todo-form button { grid-column:2; grid-row:2; width:44px; min-width:44px; min-height:42px; padding:0; font-size:0; }
+.todo-form button::after { content:'＋'; font-size:23px; font-weight:400; }
+#panel-wish > .card { display:grid; grid-template-columns:minmax(0,1fr) 44px; gap:8px; }
+#panel-wish > .card > h4, #panel-wish > .card > .sub-tabs, #panel-wish > .card > #wish-list { grid-column:1 / -1; }
+#panel-wish > .card > h4 { margin-bottom:6px; }
+#wish-input { grid-column:1 / -1; }
+#wish-deadline { grid-column:1; height:42px; min-height:42px; padding:8px 10px; }
+#panel-wish button[onclick="addWish()"] { grid-column:2; width:44px!important; min-width:44px; min-height:42px; padding:0; margin:0!important; font-size:0; }
+#panel-wish button[onclick="addWish()"]::after { content:'＋'; font-size:23px; font-weight:400; }
+#panel-wish .sub-tabs { margin:12px 0 0; }
+@media(max-width:360px) { #diary-chat-row { gap:2px; padding:5px; } #diary-chat-row .chat-icon-button, #diary-chat-row .voice-mode-toggle { flex-basis:30px; width:30px; min-width:30px; } }

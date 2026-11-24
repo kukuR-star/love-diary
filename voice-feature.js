@@ -147,7 +147,7 @@ function initDiaryVoiceComposer() {
   const record = document.createElement('button'); record.type='button'; record.className='voice-button'; record.textContent='点击录音';
   const preview = document.createElement('audio'); preview.controls=true; preview.hidden=true;
   const cancel = document.createElement('button'); cancel.type='button'; cancel.className='voice-discard'; cancel.textContent='取消'; cancel.hidden=true;
-  const submit = document.createElement('button'); submit.type='button'; submit.className='voice-send'; submit.textContent='保存日记'; submit.hidden=true;
+  const submit = document.createElement('button'); submit.type='button'; submit.className='voice-send diary-voice-submit'; submit.textContent='保存日记'; submit.setAttribute('aria-label','保存语音日记'); submit.hidden=true;
   const status = document.createElement('p'); status.className='voice-status'; status.setAttribute('role','status');
   actions.append(record,preview,cancel,submit); shell.append(toggle,actions,status); text.before(shell);
   let voiceMode=false, blob=null, previewUrl=null, token=0;
@@ -200,7 +200,9 @@ async function renderDiaryVoiceNotes(){
   for(const note of data||[]){
     const container=document.getElementById(`diary-${note.diary_id}`)?.querySelector('.diary-content');if(!container)continue;
     if(container.parentElement.querySelector('[data-diary-voice]'))continue;
-    const button=document.createElement('button');button.type='button';button.className='diary-voice-play';button.dataset.diaryVoice='';button.textContent='▶ 语音日记';
+    // Older voice-only diaries used this placeholder as content; keep actual text intact.
+    if(container.textContent.trim()==='语音日记') container.hidden=true;
+    const button=document.createElement('button');button.type='button';button.className='diary-voice-play';button.dataset.diaryVoice='';button.textContent='▶ 播放语音';
     button.onclick=async()=>{button.disabled=true;try{const result=await sb.storage.from(VOICE_BUCKET).createSignedUrl(note.audio_path,600);if(result.error)throw result.error;const audio=document.createElement('audio');audio.controls=true;audio.preload='none';audio.dataset.diaryVoice='';audio.src=result.data.signedUrl;button.replaceWith(audio);await audio.play().catch(()=>{});}catch(e){console.error(e);button.textContent='播放失败，重试';button.disabled=false;}};
     container.after(button);
   }

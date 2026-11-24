@@ -1,4 +1,4 @@
-// Shared task list: RLS controls access; owners alone may change their items.
+// Both partners may change completion state; only the creator may delete an item.
 (() => {
   let requestId = 0, tasks = [], selectedDate = null, currentMonth = new Date(), initialized = false, sessionUser = null;
   const $ = id => document.getElementById(id);
@@ -30,7 +30,7 @@
     for(const item of visible) {
       const row=node('article','todo-row'+(item.done?' is-done':''));
       const own=item.owner_id===currentUser?.id;
-      const toggle=node('button','todo-check',item.done?'✓':''); toggle.type='button'; toggle.disabled=!own; toggle.setAttribute('aria-label',`${item.done?'标记未完成':'标记完成'}：${item.title}`);
+      const toggle=node('button','todo-check',item.done?'✓':''); toggle.type='button'; toggle.setAttribute('aria-label',`${item.done?'标记未完成':'标记完成'}：${item.title}`);
       toggle.addEventListener('click',()=>updateTodo(item));
       const body=node('div','todo-body'); body.append(node('div','todo-title',item.title));
       const owner=own?'我':(partnerProfile?.nickname || 'TA'); body.append(node('div','todo-meta',`${owner}${item.due_date ? ' · '+item.due_date.replaceAll('-','/') : ''}`));
@@ -52,9 +52,10 @@
     } catch(e) {console.error('待办加载失败',e);if(req===requestId)setStatus('暂时无法加载待办，请稍后重试。',true);}
   }
   async function updateTodo(item) {
-    if(item.owner_id!==currentUser?.id) return;
-    const {data,error}=await sb.from('couple_todos').update({done:!item.done}).eq('id',item.id).eq('owner_id',currentUser.id).select('id');
-    if(error || !data?.length) return setStatus('操作失败，请稍后重试。',true);
+    if(!currentUser) return;
+    const {data,error}=await sb.from('couple_todos').update({done:!item.done}).eq('id',item.id).eq('done',item.done).select('id');
+    if(error) return setStatus('操作失败，请稍后重试。',true);
+    if(!data?.length) { await loadTodos(); return setStatus('待办已更新，请确认当前状态。',true); }
     await loadTodos();
   }
   async function removeTodo(id) {
