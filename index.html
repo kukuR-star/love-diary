@@ -1074,30 +1074,14 @@ async function updateFilterLabels(){
 // 绑定伴侣
 function openBindModal(){
   if(!currentUser) return alert("请先登录");
-  document.getElementById("bind-modal").classList.add("active");
+  alert("为保护双方的隐私，修改伴侣绑定暂不可用；现有绑定不受影响。");
 }
 function closeBindModal(){
   document.getElementById("bind-modal").classList.remove("active");
 }
 
 async function bindPartner(){
-  const email = document.getElementById("bind-email").value.trim();
-  if(!email) return alert("请输入对方邮箱");
-  if(email === myProfile.email) return alert("不能绑定自己哦");
-
-  const {data: target, error} = await sb.from("profiles").select("*").eq("email", email).single();
-  if(error || !target) return alert("找不到该用户，请确认对方已注册账号");
-
-  await sb.from("profiles").update({partner_id: target.id}).eq("id", currentUser.id);
-  await sb.from("profiles").update({partner_id: currentUser.id}).eq("id", target.id);
-
-  alert("💑 绑定成功！");
-  closeBindModal();
-  await loadMyProfile();
-  await updateCoupleStatus();
-  await updateFilterLabels();
-  await loadAllDiaries();
-  loadFlowerStats();
+  alert("修改伴侣绑定暂不可用。");
 }
 
 // 编辑资料 & 头像上传
