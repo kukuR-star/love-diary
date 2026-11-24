@@ -10,6 +10,68 @@ function stopVoiceRecording() {
   if (activeSpeechRecognition) { try { activeSpeechRecognition.stop(); } catch {} activeSpeechRecognition = null; }
 }
 window.addEventListener('pagehide', stopVoiceRecording);
+// Audio is fetched only on tap; a single player is active at a time.
+let activeVoicePlayer = null;
+function stopVoicePlayback() {
+  const player = activeVoicePlayer;
+  activeVoicePlayer = null;
+  if (!player) return;
+  player.token++;
+  player.audio.pause();
+  try { player.audio.currentTime = 0; } catch (_) {}
+  player.setState('idle');
+}
+window.addEventListener('pagehide', stopVoicePlayback);
+function createVoicePlayer(path, extraClass = '') {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = `voice-message ${extraClass}`.trim();
+  button.setAttribute('aria-label', '播放语音');
+  button.setAttribute('aria-pressed', 'false');
+  const wave = document.createElement('span'); wave.className = 'voice-message-wave'; wave.setAttribute('aria-hidden','true');
+  wave.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M7 10a4 4 0 0 1 0 4M10 7a8 8 0 0 1 0 10M13 4a12 12 0 0 1 0 16"/></svg>';
+  const label = document.createElement('span'); label.className = 'voice-message-label'; label.textContent = '语音';
+  const duration = document.createElement('span'); duration.className = 'voice-message-duration';
+  button.append(wave, label, duration);
+  const audio = document.createElement('audio'); audio.preload = 'none';
+  const player = {button, audio, token:0, expiresAt:0, setState(state) {
+    button.classList.toggle('is-playing', state === 'playing');
+    button.classList.toggle('is-loading', state === 'loading');
+    button.setAttribute('aria-pressed', String(state === 'playing'));
+    button.setAttribute('aria-label', state === 'playing' ? '停止播放语音' : '播放语音');
+    label.textContent = state === 'loading' ? '加载中' : state === 'error' ? '重试' : '语音';
+  }};
+  audio.addEventListener('loadedmetadata', () => {
+    if (Number.isFinite(audio.duration) && audio.duration > 0) duration.textContent = `${Math.ceil(audio.duration)}″`;
+  });
+  audio.addEventListener('ended', () => { if(activeVoicePlayer === player) { activeVoicePlayer=null; player.setState('idle'); } });
+  audio.addEventListener('error', () => { if(activeVoicePlayer === player) { activeVoicePlayer=null; player.setState('error'); } });
+  button.addEventListener('click', async () => {
+    if (activeVoicePlayer === player) { stopVoicePlayback(); return; }
+    stopVoicePlayback();
+    activeVoicePlayer = player;
+    const token = ++player.token;
+    player.setState('loading');
+    try {
+      if (!audio.src || Date.now() >= player.expiresAt) {
+        const result = await sb.storage.from(VOICE_BUCKET).createSignedUrl(path, 600);
+        if (result.error || !result.data?.signedUrl) throw result.error || new Error('无法获取语音');
+        if (activeVoicePlayer !== player || token !== player.token || !button.isConnected) return;
+        audio.src = result.data.signedUrl;
+        player.expiresAt = Date.now() + 540000;
+      }
+      if (activeVoicePlayer !== player || token !== player.token || !button.isConnected) return;
+      await audio.play();
+      if (activeVoicePlayer !== player || token !== player.token || !button.isConnected) { audio.pause(); return; }
+      player.setState('playing');
+    } catch (error) {
+      console.error('语音播放失败', error);
+      if (activeVoicePlayer === player && token === player.token) { activeVoicePlayer=null; player.expiresAt=0; player.setState('error'); }
+    }
+  });
+  return button;
+}
+
 // If microphone permission is granted after release, never start a hidden recording.
 function installVoiceHold(button, start, finish) {
   let held=false, cancelled=false, startY=0;
@@ -31,6 +93,7 @@ function installVoiceHold(button, start, finish) {
 async function renderVoiceComments(diaryId, mount) {
   if (!mount || !currentUser) return;
   const uid = currentUser.id;
+  if (activeVoicePlayer && mount.contains(activeVoicePlayer.button)) stopVoicePlayback();
   mount.replaceChildren();
   const section = document.createElement('section'); section.className = 'voice-section';
   const heading = document.createElement('div'); heading.className = 'voice-heading'; heading.textContent = '';
@@ -65,18 +128,13 @@ async function renderVoiceComments(diaryId, mount) {
   async function load() {
     const {data, error} = await sb.from('voice_comments').select('id,owner_id,audio_path,transcript,created_at').eq('diary_id',diaryId).order('created_at');
     if (!section.isConnected || currentUser?.id !== uid) return;
+    if (activeVoicePlayer && list.contains(activeVoicePlayer.button)) stopVoicePlayback();
     list.replaceChildren();
     if (error) { status.textContent = '语音留言暂时无法加载。'; console.error(error); return; }
     for (const item of data || []) {
       const row = document.createElement('div'); row.className = 'voice-item';
       const name = document.createElement('span'); name.className = 'voice-author'; name.textContent = item.owner_id === uid ? '我' : (authorMap[item.owner_id]?.nickname || partnerProfile?.nickname || 'TA');
-      const play = document.createElement('button'); play.type = 'button'; play.className = 'voice-play'; play.textContent = '▶ 播放语音';
-      play.addEventListener('click', async () => {
-        play.disabled = true;
-        try { const result = await sb.storage.from(VOICE_BUCKET).createSignedUrl(item.audio_path, 600); if(result.error) throw result.error;
-          const audio = document.createElement('audio'); audio.controls = true; audio.preload = 'none'; audio.src = result.data.signedUrl; play.replaceWith(audio); await audio.play().catch(()=>{});
-        } catch(e) { console.error(e); status.textContent='语音暂时无法播放。'; play.disabled=false; }
-      });
+      const play = createVoicePlayer(item.audio_path, 'voice-play');
       row.append(name,play);
       if (item.owner_id === uid) {
         const remove = document.createElement('button'); remove.type='button'; remove.className='voice-remove'; remove.textContent='删除';
@@ -213,20 +271,13 @@ function initDiaryVoiceComposer() {
     finally{submit.disabled=false;record.disabled=false;}
   });
 }
-let diaryVoiceRenderVersion = 0;
-async function renderDiaryVoiceNotes(){
-  const version = ++diaryVoiceRenderVersion;
-  if(!currentUser || !allDiaryList.length)return;
-  const userId=currentUser.id;const ids=allDiaryList.map(item=>item.id);
-  const {data,error}=await sb.from('diary_voice_notes').select('diary_id,audio_path').in('diary_id',ids);
-  if(error){console.error('语音日记加载失败',error);return;}if(currentUser?.id!==userId || version !== diaryVoiceRenderVersion)return;
-  for(const note of data||[]){
-    const container=document.getElementById(`diary-${note.diary_id}`)?.querySelector('.diary-content');if(!container)continue;
-    if(container.parentElement.querySelector('[data-diary-voice]'))continue;
-    // Older voice-only diaries used this placeholder as content; keep actual text intact.
-    if(container.textContent.trim()==='语音日记') container.hidden=true;
-    const button=document.createElement('button');button.type='button';button.className='diary-voice-play';button.dataset.diaryVoice='';button.textContent='▶ 播放语音';
-    button.onclick=async()=>{button.disabled=true;try{const result=await sb.storage.from(VOICE_BUCKET).createSignedUrl(note.audio_path,600);if(result.error)throw result.error;const audio=document.createElement('audio');audio.controls=true;audio.preload='none';audio.dataset.diaryVoice='';audio.src=result.data.signedUrl;button.replaceWith(audio);await audio.play().catch(()=>{});}catch(e){console.error(e);button.textContent='播放失败，重试';button.disabled=false;}};
+function renderDiaryVoiceNotes(){
+  if (!currentUser) return;
+  for (const [id, path] of Object.entries(diaryVoiceMap)) {
+    const container = document.getElementById(`diary-${id}`)?.querySelector('.diary-content');
+    if (!container || container.parentElement.querySelector('[data-diary-voice]')) continue;
+    const button = createVoicePlayer(path, 'diary-voice-play');
+    button.dataset.diaryVoice = '';
     container.after(button);
   }
 }

@@ -4,6 +4,27 @@
   const $ = id => document.getElementById(id);
   const localDate = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   function node(tag, cls, content) { const el = document.createElement(tag); if(cls) el.className=cls; if(content !== undefined) el.textContent=content; return el; }
+  function setupTodoDate() {
+    const input = $('todo-date-input');
+    if (!input) return;
+    if (!input.closest('.todo-date-field')) {
+      const wrapper = node('div', 'todo-date-field is-empty');
+      const display = node('span', 'wish-date-label');
+      const icon = node('span', 'wish-date-icon');
+      display.setAttribute('aria-hidden', 'true'); icon.setAttribute('aria-hidden', 'true');
+      input.before(wrapper); wrapper.append(display, icon, input);
+      input.addEventListener('input', refreshTodoDate);
+      input.addEventListener('change', refreshTodoDate);
+    }
+    refreshTodoDate();
+  }
+  function refreshTodoDate() {
+    const input = $('todo-date-input'), wrapper = input?.closest('.todo-date-field');
+    if (!wrapper) return;
+    const valid = /^\d{4}-\d{2}-\d{2}$/.test(input.value);
+    wrapper.querySelector('.wish-date-label').textContent = valid ? input.value.replaceAll('-', ' / ') : '年 / 月 / 日';
+    wrapper.classList.toggle('is-empty', !valid);
+  }
   function setStatus(message, error = false) { const el=$('todo-status'); if(el) { el.textContent=message; el.classList.toggle('is-error',error); } }
   function renderCalendar() {
     const grid=$('todo-calendar-grid'); if(!grid) return;
@@ -91,6 +112,7 @@
     if (sessionUser !== currentUser.id) { sessionUser = currentUser.id; tasks = []; selectedDate = null; currentMonth = new Date(); }
     if(!initialized || !$('todo-form')) {
       root.innerHTML=`<section class="todo-shell"><header class="todo-heading"><div><p class="todo-kicker">LITTLE THINGS</p><h2>一起打理生活</h2><p>把琐碎的事，轻轻放在这里。</p></div></header><form id="todo-form" class="todo-form"><label class="todo-visually-hidden" for="todo-title-input">待办内容</label><input id="todo-title-input" maxlength="100" placeholder="添加一件待办…" required><label class="todo-visually-hidden" for="todo-date-input">日期（可选）</label><input id="todo-date-input" type="date" aria-label="日期（可选）"><button type="submit">添加</button></form><details class="todo-calendar"><summary>日历 <span>按日期查看</span></summary><div class="calendar-header todo-calendar-nav"><button type="button" id="todo-prev" aria-label="上个月">‹</button><strong id="todo-month-label"></strong><button type="button" id="todo-next" aria-label="下个月">›</button></div><div class="week-header todo-week"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div><div class="calendar-grid todo-calendar-grid" id="todo-calendar-grid"></div></details><div class="todo-list-heading"><h3 id="todo-filter-label">全部待办</h3><button type="button" id="todo-clear-filter" hidden>查看全部</button></div><div id="todo-items"></div><p id="todo-status" class="todo-status" role="status" aria-live="polite"></p></section>`;
+      setupTodoDate();
       $('todo-prev').onclick=()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()-1,1);renderCalendar();};
       $('todo-next').onclick=()=>{currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()+1,1);renderCalendar();};
       $('todo-clear-filter').onclick=()=>{selectedDate=null;renderCalendar();renderTasks();};
@@ -99,7 +121,7 @@
         const uid=currentUser.id, input=$('todo-title-input'), date=$('todo-date-input'), title=input.value.trim();
         if(!title || title.length>100)return setStatus('请输入待办内容。',true);
         const button=e.currentTarget.querySelector('button'); button.disabled=true;setStatus('保存中…');
-        try {const {error}=await sb.from('couple_todos').insert({owner_id:uid,title,due_date:date.value||null});if(error)throw error;if(currentUser?.id!==uid)return;input.value='';date.value='';selectedDate=null;await loadTodos();}
+        try {const {error}=await sb.from('couple_todos').insert({owner_id:uid,title,due_date:date.value||null});if(error)throw error;if(currentUser?.id!==uid)return;input.value='';date.value='';refreshTodoDate();selectedDate=null;await loadTodos();}
         catch(error){console.error(error);setStatus('保存失败，请稍后重试。',true);}
         finally {button.disabled=false;}
       };

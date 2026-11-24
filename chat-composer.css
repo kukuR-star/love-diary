@@ -24,3 +24,5 @@
 .chat-composer .voice-hold[hidden] { display:none!important; }
 .chat-composer button:disabled { opacity:.4; box-shadow:none; cursor:default; }
 .chat-composer textarea { resize:none; }
+
+.chat-composer .chat-add { flex-basis:38px; width:38px; min-width:38px; height:38px; }

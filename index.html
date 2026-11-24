@@ -950,6 +950,7 @@ let allDiaryList = [];
 let authorMap = {};
 let likeMap = {};
 let commentCountMap = {};
+let diaryVoiceMap = {};
 
 // 所有用户提供的文本在插入 HTML 前转义。
 function escapeHtml(value){
@@ -1034,6 +1035,7 @@ async function signUp(){
   alert("注册成功！请登录");
 }
 async function signOut(){
+  stopVoicePlayback();
   stopVoiceRecording();
   ChatComposer.clearAll();
   await sb.auth.signOut();
@@ -1198,6 +1200,7 @@ document.querySelectorAll(".main-tab").forEach(tab=>{
     document.querySelectorAll(".panel").forEach(p=>p.classList.remove("active"));
     this.classList.add("active");
     document.getElementById("panel-"+name).classList.add("active");
+    stopVoicePlayback();
     if (name === "album") loadAlbum();
     if (name === "todos") initTodos();
   }
@@ -1273,6 +1276,13 @@ async function loadAllDiaries(){
     likeMap[l.diary_id].push(l.user_id);
   });
 
+  const diaryIds = allDiaryList.map(d => d.id);
+  diaryVoiceMap = {};
+  if (diaryIds.length) {
+    const {data: voiceNotes, error: voiceError} = await sb.from("diary_voice_notes").select("diary_id,audio_path").in("diary_id", diaryIds);
+    if (voiceError) console.error("语音日记加载失败", voiceError);
+    else for (const note of voiceNotes || []) diaryVoiceMap[note.diary_id] = note.audio_path;
+  }
   await refreshCommentCounts();
   renderDiaryList();
   renderCalendar();
@@ -1324,6 +1334,7 @@ function switchView(dom){
 
 // 渲染日记列表
 function renderDiaryList(){
+  stopVoicePlayback();
   stopVoiceRecording();
   let list = allDiaryList;
   
@@ -1336,8 +1347,7 @@ function renderDiaryList(){
 
   // 日期筛选
   if(selectedDate){
-    const dateStr = selectedDate.toISOString().split('T')[0];
-    list = list.filter(d=> d.created_at.startsWith(dateStr));
+    list = list.filter(d=> localDayKey(new Date(d.created_at)) === selectedDate);
   }
 
   const container = document.getElementById("diary-list");
@@ -1374,7 +1384,7 @@ function renderDiaryList(){
         <div class="diary-time">${time}</div>
       </div>
       ${moodFaces[item.mood] ? `<span class="mood-tag" aria-label="心情：${escapeHtml(item.mood)}">${moodIcon(item.mood)}</span>` : ''}
-      <div class="diary-content">${escapeHtml(item.content)}</div>
+      <div class="diary-content" ${diaryVoiceMap[item.id] && item.content.trim() === '语音日记' ? 'hidden' : ''}>${escapeHtml(item.content)}</div>
       <div class="chat-images" id="diary-images-${item.id}"></div>
       <div class="diary-actions">
         <button type="button" class="interaction-btn ${liked ? 'liked' : ''}" aria-pressed="${!!liked}" onclick="toggleLike('${item.id}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.3C5 7 9.1 5.9 12 9c2.9-3.1 7-2 7 1.7C19 15.6 12 20 12 20Z"/></svg><span>${liked ? '已赞' : '赞'}${likeCount ? ' · '+likeCount : ''}</span></button>
@@ -1435,6 +1445,7 @@ function toggleComment(diaryId){
     renderVoiceComments(diaryId, document.getElementById(`voice-comments-${diaryId}`));
     ChatComposer.mountComment(diaryId);
   } else {
+    stopVoicePlayback();
     stopVoiceRecording();
   }
 }
@@ -1506,12 +1517,15 @@ async function deleteComment(commentId, diaryId){
 
 
 // ===================== 日历视图 =====================
+function localDayKey(date){
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
 function prevMonth(){
-  currentMonth.setMonth(currentMonth.getMonth()-1);
+  currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth()-1, 1);
   renderCalendar();
 }
 function nextMonth(){
-  currentMonth.setMonth(currentMonth.getMonth()+1);
+  currentMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth()+1, 1);
   renderCalendar();
 }
 
@@ -1527,7 +1541,7 @@ function renderCalendar(){
 
   // 有日记的日期集合
   const diaryDates = new Set(
-    allDiaryList.map(d=> new Date(d.created_at).toISOString().split('T')[0])
+    allDiaryList.map(d=> localDayKey(new Date(d.created_at)))
   );
 
   let html = '';
@@ -1536,16 +1550,16 @@ function renderCalendar(){
     html += `<div class="calendar-day other-month"></div>`;
   }
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = localDayKey(new Date());
   
   for(let day=1; day<=totalDays; day++){
     const date = new Date(year, month, day);
-    const dateStr = date.toISOString().split('T')[0];
+    const dateStr = localDayKey(date);
     let classes = 'calendar-day';
     
     if(dateStr === todayStr) classes += ' today';
     if(diaryDates.has(dateStr)) classes += ' has-diary';
-    if(selectedDate && dateStr === selectedDate.toISOString().split('T')[0]) classes += ' selected';
+    if(selectedDate && dateStr === selectedDate) classes += ' selected';
 
     html += `<div class="${classes}" onclick="selectDate('${dateStr}')">${day}</div>`;
   }
@@ -1554,7 +1568,7 @@ function renderCalendar(){
 }
 
 function selectDate(dateStr){
-  selectedDate = new Date(dateStr);
+  selectedDate = dateStr;
   renderCalendar();
   if(currentView === 'calendar'){
     document.querySelector('.view-btn[data-view="list"]').click();
